@@ -1,7 +1,6 @@
 import pickle
 from dataclasses import dataclass
 from typing import List
-import sounddevice
 
 VOICE_PORT = 5555
 DATA_PORT = 6666
