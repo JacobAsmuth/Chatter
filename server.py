@@ -10,6 +10,7 @@ import pydub
 from client_object import ClientObject
 import shared
 import io
+from sys import exit
 
 
 class Server:
@@ -126,8 +127,8 @@ class Server:
                             continue
                         try:
                             data = client.voice_socket.recv(shared.BYTES_PER_CHUNK)
-                            #all_voice_data[client] = pydub.AudioSegment(data, sample_width=shared.SAMPLE_WIDTH, frame_rate=shared.SAMPLE_RATE, channels=shared.CHANNELS)
-                            segment = pydub.AudioSegment(data).set_frame_rate(48000).set_channels(2).set_sample_width(2)
+                            segment = pydub.AudioSegment(data, sample_width=shared.SAMPLE_WIDTH, frame_rate=shared.SAMPLE_RATE, channels=shared.CHANNELS)
+                            #segment = pydub.AudioSegment(data).set_frame_rate(48000).set_channels(2).set_sample_width(2)
                             all_voice_data[client] = segment
                         except socket.error:
                             print("Removed client %s" % (user_id,))
@@ -159,7 +160,7 @@ class Server:
             if gain != 0:
                 #new_audio = source_audio - gain  # gain is in percent. Log10(gain) converts to DB.
                 if final_audio:
-                    #source_audio = source_audio.adjust_gain(np.log10(gain*100))
+                    #source_audio = source_audio.apply_gain(np.log10(gain*100))
                     final_audio = final_audio.overlay(source_audio)
                 else:
                     final_audio = source_audio

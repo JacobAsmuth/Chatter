@@ -41,8 +41,8 @@ class Client:
         self.voice_port = voice_port
         self.data_port = data_port
 
-        self.recording_stream = sounddevice.RawInputStream(channels=shared.CHANNELS, blocksize=shared.BYTES_PER_CHUNK, samplerate=shared.SAMPLE_RATE, dtype=np.int16, latency='low')
-        self.playing_stream = sounddevice.RawOutputStream(channels=shared.CHANNELS, blocksize=shared.BYTES_PER_CHUNK, samplerate=shared.SAMPLE_RATE, dtype=np.int16, latency='low')
+        self.recording_stream = sounddevice.RawInputStream(channels=shared.CHANNELS, blocksize=shared.BYTES_PER_CHUNK, samplerate=shared.SAMPLE_RATE, dtype=np.int16)
+        self.playing_stream = sounddevice.RawOutputStream(channels=shared.CHANNELS, blocksize=shared.BYTES_PER_CHUNK, samplerate=shared.SAMPLE_RATE, dtype=np.int16)
         
         self.server_voice_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_voice_socket.connect((ip, voice_port))
