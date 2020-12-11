@@ -63,13 +63,11 @@ class ClientObject:
                     self.packet_handlers[packet_type](packet)
                 else:
                     print("Unkown packet: %s" % (packet,))
-            except WindowsError as e:
+            except Exception as e:
                 if not self.closing:
                     print("Error parsing packet: %s, closing socket" % (e,))
                     self.data_socket.close()
                 break
-            except Exception as e:
-                print("Error parsing packet: %s" % (e,))
 
     def ping_packet_handler(self, packet):
         print("Ping from %s received!" % (self.user_id,))
