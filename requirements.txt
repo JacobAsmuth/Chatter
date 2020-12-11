@@ -1,0 +1,5 @@
+numpy==1.19.3
+pydub==0.24.1
+pylint==2.6.0
+Pymem==1.4
+sounddevice==0.4.1
