@@ -11,6 +11,7 @@ from queue import Queue, Empty
 from time import sleep
 import sounddevice
 import numpy as np
+import uuid
 
 class Client:
     def __init__(self):
@@ -18,6 +19,7 @@ class Client:
         self.ip = None
         self.voice_port = None
         self.data_port = None
+        self.user_id = uuid.uuid4()
 
         self.server_voice_socket = None
         self.server_data_socket = None
@@ -46,7 +48,7 @@ class Client:
         
         self.server_voice_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_voice_socket.connect((ip, voice_port))
-        self.user_id = ':'.join(str(x) for x in self.server_voice_socket.getsockname())
+        self.server_voice_socket.send(str(self.user_id).encode(shared.ENCODING))
 
         # The server will respond with a ping msg when it's ready for data
         _ = self.server_voice_socket.recv(1024)

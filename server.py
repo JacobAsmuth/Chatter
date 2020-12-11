@@ -75,9 +75,10 @@ class Server:
         while True:
             socket, _ = self.voice_socket.accept()
             with self.clients_lock:
-                client = ClientObject(socket)
-
-                self.clients[client.user_id] = client
+                user_id = self.user_id_from_socket(socket)
+    
+                client = ClientObject(socket, user_id)
+                self.clients[user_id] = client
                 print("Received new voice client: %s" % (client.user_id,))
 
                 # The client waits for this message after voice connection.

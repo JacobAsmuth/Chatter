@@ -7,15 +7,14 @@ import pickle
 import time
 
 class ClientObject:
-    def __init__(self, voice_socket: socket.socket):
-        self.closing = False
+    def __init__(self, voice_socket: socket.socket, user_id: str):
+        self.user_id = user_id
         self.voice_socket = voice_socket
-        self.user_id = ':'.join(str(x) for x in voice_socket.getpeername())
+
+        self.closing = False
         self.player_id = None  # In-game player ID
         self.data_socket = None
         self.send_queue = queue.Queue()
-        self.receive_data_thread = threading.Thread(target=self.receive_data_from_client, daemon=True)
-        self.send_data_thread = threading.Thread(target=self.send_data_to_client, daemon=True)
         self.audio_levels_map = collections.defaultdict(float)
         self.packet_handlers = {
             shared.PingPacket: self.ping_packet_handler,
@@ -35,8 +34,8 @@ class ClientObject:
 
     def set_data_socket(self, data_socket: socket.socket):
         self.data_socket = data_socket
-        self.receive_data_thread.start()
-        self.send_data_thread.start()
+        threading.Thread(target=self.receive_data_from_client, daemon=True).start()
+        threading.Thread(target=self.send_data_to_client, daemon=True).start()
 
     def send_data_to_client(self):
         while True:
