@@ -182,6 +182,8 @@ class Server:
             print('Unknown command :(')
 
     def exit_command(self, args):
+        self.data_socket.close()
+        self.voice_socket.close()
         exit()
 
     def help_command(self, args):
