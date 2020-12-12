@@ -1,4 +1,4 @@
-from server import Server
+from server.server import Server  # pylint: disable-msg=E0611
 import shared
 
 def main():

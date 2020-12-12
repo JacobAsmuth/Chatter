@@ -1,8 +1,9 @@
 import sys
-from client import Client
+from client.client import Client # pylint: disable-msg=E0611
 import client.memory as memory
-from client.audio_engines.linear import Linear
 import shared
+from client.audio_engines.linear import Linear # pylint: disable-msg=E0611
+
 
 def main(args):
     mem = memory.AmongUsMemory()
