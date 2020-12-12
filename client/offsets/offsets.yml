@@ -46,6 +46,6 @@ player:
   localY: [0x60, 0x54]
   remoteX: [0x60, 0x3C]
   remoteY: [0x60, 0x40]
-  bufferLength: 56
+  bufferLength: 48
   offsets: [0, 0]
   inVent: [0x31]

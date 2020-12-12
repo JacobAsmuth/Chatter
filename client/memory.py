@@ -10,13 +10,15 @@ pymem.logger.setLevel(pymem.logging.ERROR)
 
 @dataclass
 class Player:
-    name: str
-    player_id: int
+    playerId: int
     dead: bool
     disconnected: bool
     impostor: bool
     exiled: bool
-    is_local: bool
+    isLocal: bool
+    inVent: bool
+    x: float
+    y: float
 
 class GameState(enum.Enum):
     MENU = 0
@@ -52,6 +54,7 @@ class AmongUsMemory:
 
     def open_process(self):
         try:
+            del self.pm
             self.pm = pymem.Pymem("Among Us.exe")
             self.base_addr = pymem.process.module_from_name(self.pm.process_handle, "GameAssembly.dll").lpBaseOfDll
             return True
@@ -102,25 +105,48 @@ class AmongUsMemory:
         return new_code
 
     def get_all_players(self):
-        allPlayersPtr = self.read_memory(self.base_addr, self.offsets['allPlayersPtr'], self.pm.read_uint) & 0xffffffff
-        allPlayers = self.read_memory(allPlayersPtr, self.offsets['allPlayers'], self.pm.read_uint)
+        allPlayersPtr = self.read_memory(self.base_addr, self.offsets['allPlayersPtr'], self.pm.read_ulonglong) & 0xffffffff
+        allPlayers = self.read_memory(allPlayersPtr, self.offsets['allPlayers'], self.pm.read_ulonglong)
         playerCount = self.read_memory(allPlayersPtr, self.offsets['playerCount'], self.pm.read_int)
         playerAddrPtr = allPlayers + self.offsets['playerAddrPtr']
-        exiledPlayerId = self.read_memory(self.base_addr, self.offsets['exiledPlayerId'], self.pm.read_int)
+        #exiledPlayerId = self.read_memory(self.base_addr, self.offsets['exiledPlayerId'], self.pm.read_uchar)
         players = []
 
         for _ in range(min(playerCount, 10)):
             address, last = self.offset_address(playerAddrPtr, self.offsets['player']['offsets'])
-            playerData = self.pm.read_bytes(address + last, self.offsets['player']['BufferLength'])
-            player = self._parse_player(address + last, playerData, exiledPlayerId)
+            playerData = self.pm.read_bytes(address + last, self.offsets['player']['bufferLength'])
+            player = self._parse_player(address + last, playerData, 0)
             playerAddrPtr += 4
             players.append(player)
         return players
 
     def _parse_player(self, addr, data, exiledPlayerId):
-        fields = struct.unpack(self.struct_format, data)
+        values = self._named_fields_from_struct(struct.unpack(self.struct_format, data))
+        object_ptr = values['objectPtr']
 
-        return Player()
+        is_local = self.read_memory(object_ptr, self.offsets['player']['isLocal'], self.pm.read_int) != 0
+
+        position_offsets = self._get_position_offsets(is_local)
+
+        x_pos = self.read_memory(object_ptr, position_offsets[0], self.pm.read_float)
+        y_pos = self.read_memory(object_ptr, position_offsets[1], self.pm.read_float)
+        in_vent = self.read_memory(object_ptr, self.offsets['player']['inVent'], self.pm.read_uchar) != 0
+
+        return Player(
+            player_id=values['id'],
+            disconnected=values['disconnected'],
+            impostor=values['impostor'],
+            dead=values['dead'],
+            inVent=in_vent,
+            isLocal=is_local,
+            x=x_pos,
+            y=y_pos,
+        )
+
+    def _get_position_offsets(self, is_local):
+        if is_local:
+            return (self.offsets['player']['localX'], self.offsets['player']['localY'])
+        return (self.offsets['player']['remoteX'], self.offsets['player']['remoteY'])
 
     #  https://docs.python.org/3/library/struct.html
     def _struct_format_from_offsets(self):
@@ -132,11 +158,11 @@ class AmongUsMemory:
             elif field['type'] == "UINT":
                 vals.append('I')
             elif field['type'] == "BYTE":
-                vals.append('c')
+                vals.append('?')
         return ''.join(vals)
 
-    def _player_object_from_struct(self, fields):
-        pass
+    def _named_fields_from_struct(self, fields):
+        return {k: v for k, v in zip((x['name'] for x in self.offsets['player']['struct'] if x['name'] != 'unused'), fields)}
 
     def read_string(self, address):
         if address == 0:

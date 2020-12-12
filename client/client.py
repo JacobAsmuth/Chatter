@@ -183,7 +183,8 @@ class Client:
                 #self.send(self.audio_engine.get_audio_levels(self.among_us_memory.read()))
                 print(self.among_us_memory.read())
                 sleep(5)
-            except Exception:
+            except Exception as e:
+                print(e)
                 sleep(5)
                 self._poll_among_us()
             
