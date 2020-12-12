@@ -72,7 +72,7 @@ class ClientObject:
         print("Ping from %s received!" % (self.user_id,))
 
     def user_info_packet_handler(self, packet: shared.UserInfoPacket):
-        self.player_id = packet.player_id
+        self.player_id = packet.playerId
 
     def audio_levels_packet_handler(self, packet: shared.AudioLevelsPacket):
         for player_id, gain in zip(packet.player_ids, packet.gains):
