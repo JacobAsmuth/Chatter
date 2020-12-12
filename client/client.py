@@ -68,7 +68,7 @@ class Client:
 
         threading.Thread(target=self.receive_server_data, daemon=True).start()
         threading.Thread(target=self.send_client_data, daemon=True).start()
-        #threading.Thread(target=self.read_memory, daemon=True).start()
+        threading.Thread(target=self.read_memory, daemon=True).start()
 
     def close(self):
         self.exiting = True
@@ -180,8 +180,11 @@ class Client:
 
         while True:
             try:
-                self.send(self.audio_engine.get_audio_levels(self.among_us_memory.read()))
-            except: 
+                #self.send(self.audio_engine.get_audio_levels(self.among_us_memory.read()))
+                print(self.among_us_memory.read())
+                sleep(5)
+            except Exception:
+                sleep(5)
                 self._poll_among_us()
             
 

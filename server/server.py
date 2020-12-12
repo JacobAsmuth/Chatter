@@ -74,6 +74,8 @@ class Server:
             socket, _ = self.voice_socket.accept()
             with self.clients_lock:
                 user_id = self.user_id_from_socket(socket)
+                if not user_id:
+                    continue
     
                 client = ClientObject(socket, user_id)
                 self.clients[user_id] = client
@@ -81,7 +83,10 @@ class Server:
 
                 # The client waits for this message after voice connection.
                 # This makes sure we don't attempt data connection before client object is in memory
-                socket.send("Ready for data connection!".encode(shared.ENCODING))
+                try:
+                    socket.send("Ready for data connection!".encode(shared.ENCODING))
+                except:
+                    client.close()
 
     def receive_data_connections(self):
         while True:
