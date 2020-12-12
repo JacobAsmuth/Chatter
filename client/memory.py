@@ -17,8 +17,7 @@ class Player:
     exiled: bool
     isLocal: bool
     inVent: bool
-    x: float
-    y: float
+    pos: tuple[float, float]
 
 class GameState(enum.Enum):
     MENU = 0
@@ -29,6 +28,7 @@ class GameState(enum.Enum):
 @dataclass
 class MemoryRead:
     players: List[Player]
+    local_player: Player
     game_state: GameState
     game_code: str
 
@@ -47,7 +47,10 @@ class AmongUsMemory:
     def read(self):
         if not self.pm:
             return None
-        return MemoryRead(players=self.get_all_players(),
+
+        players, local_player = self.get_all_players()
+        return MemoryRead(players=players,
+                            local_player=local_player,
                             game_state=self.get_game_state(),
                             game_code=self.get_game_code(),
                             )
@@ -111,20 +114,24 @@ class AmongUsMemory:
         playerAddrPtr = allPlayers + self.offsets['playerAddrPtr']
         #exiledPlayerId = self.read_memory(self.base_addr, self.offsets['exiledPlayerId'], self.pm.read_uchar)
         players = []
+        local_player = None
 
         for _ in range(min(playerCount, 10)):
             address, last = self.offset_address(playerAddrPtr, self.offsets['player']['offsets'])
             playerData = self.pm.read_bytes(address + last, self.offsets['player']['bufferLength'])
             player = self._parse_player(address + last, playerData, 0)
             playerAddrPtr += 4
-            players.append(player)
-        return players
+            if player.isLocal:
+                local_player = player
+            else:
+                players.append(player)
+        return players, local_player
 
     def _parse_player(self, addr, data, exiledPlayerId):
         values = self._named_fields_from_struct(struct.unpack(self.struct_format, data))
         object_ptr = values['objectPtr']
 
-        is_local = self.read_memory(object_ptr, self.offsets['player']['isLocal'], self.pm.read_int) != 0
+        is_local = self.read_memory(object_ptr, self.offsets['player']['isLocal'], self.pm.read_int)
 
         position_offsets = self._get_position_offsets(is_local)
 
@@ -133,14 +140,14 @@ class AmongUsMemory:
         in_vent = self.read_memory(object_ptr, self.offsets['player']['inVent'], self.pm.read_uchar) != 0
 
         return Player(
-            player_id=values['id'],
+            exiled=False,
+            playerId=values['id'],
             disconnected=values['disconnected'],
             impostor=values['impostor'],
             dead=values['dead'],
             inVent=in_vent,
             isLocal=is_local,
-            x=x_pos,
-            y=y_pos,
+            pos=(x_pos, y_pos),
         )
 
     def _get_position_offsets(self, is_local):

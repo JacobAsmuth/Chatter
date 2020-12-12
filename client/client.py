@@ -26,6 +26,7 @@ class Client:
         self.voice_port = None
         self.data_port = None
         self.user_id = uuid.uuid4()
+        self.server_player_id = None
 
         self.server_voice_socket = None
         self.server_data_socket = None
@@ -121,6 +122,7 @@ class Client:
                 break
             except Exception as e:
                 print("Error parsing packet: %s" % (e,))
+                break
 
     def send_client_data(self):
         while True:
@@ -180,8 +182,14 @@ class Client:
 
         while True:
             try:
-                #self.send(self.audio_engine.get_audio_levels(self.among_us_memory.read()))
-                print(self.among_us_memory.read())
+                memory_read = self.among_us_memory.read()
+                if memory_read.local_player:
+                    player_id = memory_read.local_player.playerId
+                    if not self.server_player_id or self.server_player_id != player_id:
+                        self.send(shared.UserInfoPacket(playerId=player_id))  # update the server with our new player ID
+                        self.server_player_id = player_id
+
+                #self.send(self.audio_engine.get_audio_levels(memory_read))
                 sleep(5)
             except Exception as e:
                 print(e)

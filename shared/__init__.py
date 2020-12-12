@@ -16,7 +16,7 @@ PICKLE_PROTOCOL = pickle.HIGHEST_PROTOCOL
 
 @dataclass
 class UserInfoPacket:
-    player_id: int
+    playerId: int
 
 @dataclass
 class PingPacket:
@@ -29,5 +29,5 @@ class ServerSettingsPacket:
 
 @dataclass
 class AudioLevelsPacket:
-    player_ids: List[int]
+    playerIds: List[int]
     gains: List[float]
