@@ -15,10 +15,10 @@ from sys import exit
 
 import shared
 import client.memory as memory
-import client.audio_engines as audio_engines
+import client.audio_engines
 
 class Client:
-    def __init__(self, among_us_memory: memory.AmongUsMemory, audio_engine: audio_engines.AudioEngineBase):
+    def __init__(self, among_us_memory: memory.AmongUsMemory, audio_engine: client.audio_engines.AudioEngineBase):
         self.among_us_memory = among_us_memory
         self.audio_engine = audio_engine
         self.exiting = False
@@ -59,7 +59,7 @@ class Client:
         # The server will respond with a ping msg when it's ready for data
         _ = self.server_voice_socket.recv(1024)
 
-        self.server_data_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.server_data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_data_socket.connect((ip, data_port))
         self.server_data_socket.send(str(self.user_id).encode(shared.ENCODING))
 

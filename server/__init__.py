@@ -36,7 +36,7 @@ class Server:
         self.voice_port = port
 
     def bind_data(self, port):
-        self.data_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.data_socket.bind((self.ip, port))
         self.data_socket.listen(shared.MAX_CONCURRENT_CONNECTIONS)
         self.data_port = port
@@ -170,7 +170,8 @@ class Server:
         try:
             destination_client.voice_socket.send(final_audio.raw_data)
         except Exception as e:
-            print("Error: " + str(e))
+            print("Error sending final audio: " + str(e))
+            destination_client.close()
 
     def run_command(self, command):
         if command[0] in self.command_map:

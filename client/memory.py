@@ -14,6 +14,8 @@ class Player:
     dead: bool
     disconnected: bool
     impostor: bool
+    exiled: bool
+    is_local: bool
 
 class GameState(enum.Enum):
     MENU = 0
@@ -36,7 +38,7 @@ class AmongUsMemory:
 
     def _load_offsets(self):
         with open("client/offsets/offsets.yml", mode='r') as f:
-            return yaml.load(f)
+            return yaml.load(f, Loader=yaml.FullLoader)
 
     def read(self):
         return MemoryRead(players=self.get_all_players(),
@@ -96,7 +98,8 @@ class AmongUsMemory:
         return new_code
 
 
-    def _parse_player(self, addr, data):
+    def _parse_player(self, addr, data, exiledPlayerId):
+
         return Player()
 
     def get_all_players(self):
@@ -110,19 +113,10 @@ class AmongUsMemory:
         for _ in range(min(playerCount, 10)):
             address, last = self.offset_address(playerAddrPtr, self.offsets.player.offsets)
             playerData = self.pm.read_bytes(address + last, self.offsets.player.BufferLength)
-            player = self._parse_player(address + last, playerData)
+            player = self._parse_player(address + last, playerData, exiledPlayerId)
             playerAddrPtr += 4
             players.append(player)
-
-            if (player.name == '' or player.player_id == exiledPlayerId or player.dead or player.disconnected):
-                continue
-
-            if player.impostor:
-                impostors += 1
-            else:
-                crewmates += 1
         return players
-
 
     def read_string(self, address):
         if address == 0:
@@ -151,3 +145,18 @@ class AmongUsMemory:
         last = offsets[-1] if offsets else 0
         return address, last
 
+    #  https://docs.python.org/3/library/struct.html
+    def _generate_struct_str_from_offsets(self):
+        vals = ['=']
+        for field in self.offsets.player.struct:
+            if field.type == "SKIP":
+                vals.append(str(field.skip))
+                vals.append('x')
+            elif field.type == "UINT":
+                vals.append('I')
+            elif field.type == "BYTE":
+                vals.append('c')
+        return ''.join(vals)
+
+    def _player_object_from_struct(self, fields):
+        pass
