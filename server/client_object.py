@@ -48,8 +48,7 @@ class ClientObject:
             except Exception as e:
                 if not self.closing:
                     print("Unable to send %s: %s" % (object_to_send, e))
-                else:
-                    break
+                break
 
     def send(self, packet):
         self.send_queue.put_nowait(packet)
