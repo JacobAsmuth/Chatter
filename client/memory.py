@@ -61,7 +61,7 @@ class AmongUsMemory:
             self.pm = pymem.Pymem("Among Us.exe")
             self.base_addr = pymem.process.module_from_name(self.pm.process_handle, "GameAssembly.dll").lpBaseOfDll
             return True
-        except Exception:
+        except:
             return False
 
     def get_game_state(self):
