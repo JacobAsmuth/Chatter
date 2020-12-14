@@ -189,8 +189,8 @@ class Client:
                         self.send(shared.UserInfoPacket(playerId=player_id))  # update the server with our new player ID
                         self.server_player_id = player_id
 
-                #self.send(self.audio_engine.get_audio_levels(memory_read))
-                sleep(5)
+                self.send(self.audio_engine.get_audio_levels(memory_read))
+                sleep(1)
             except Exception as e:
                 print(e)
                 sleep(5)

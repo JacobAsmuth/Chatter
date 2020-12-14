@@ -75,5 +75,6 @@ class ClientObject:
         self.player_id = packet.playerId
 
     def audio_levels_packet_handler(self, packet: shared.AudioLevelsPacket):
+        print(self.player_id, "sent", str(packet))
         for player_id, gain in zip(packet.player_ids, packet.gains):
             self.audio_levels_map[player_id] = gain
