@@ -46,6 +46,7 @@ class Client:
         }
 
     def connect(self, ip, voice_port, data_port):
+        self.exiting = False
         self.ip = ip
         self.voice_port = voice_port
         self.data_port = data_port
@@ -90,6 +91,11 @@ class Client:
             self.playing_stream.stop()
         except: pass
 
+        try:
+            while not self.send_queue.empty():
+                self.send_queue.get_nowait()
+        except: pass
+
     def wait_for_commands(self):
         print("Type help for available commands.")
         while True:
@@ -105,15 +111,20 @@ class Client:
                 print(str(e))
 
     def receive_server_data(self):
-        while True:
+        while not self.exiting:
             try:
                 data = self.server_data_socket.recv(1024)
+                if len(data) == 0:
+                    self.close()
+
                 packet = pickle.loads(data)
                 packet_type = type(packet)
+
                 if packet_type in self.packet_handlers:
                     self.packet_handlers[packet_type](packet)
                 else:
                     print("Unknown packet: %s" % (packet,))
+
             except WindowsError as e:
                 if not self.exiting:
                     print("Error with data socket: %s, closing data and voice connections." % (e,))
@@ -121,17 +132,23 @@ class Client:
                     self.server_voice_socket.close()
                 break
             except Exception as e:
-                print("Error parsing packet: %s" % (e,))
+                if not self.exiting:
+                    self.close()
+                    print("Error parsing packet: %s" % (e,))
                 break
 
     def send_client_data(self):
-        while True:
+        while not self.exiting:
             try:
                 object_to_send = self.send_queue.get_nowait()
                 val = pickle.dumps(object_to_send, protocol=shared.PICKLE_PROTOCOL)
                 self.server_data_socket.sendall(val)
             except Empty:
                 sleep(0.1)
+            except WindowsError:
+                if not self.exiting:
+                    self.close()
+                    print("Remote server died :(")
             except Exception as e:
                 print("Unable to send %s: %s" % (object_to_send, e))
                 
@@ -140,32 +157,32 @@ class Client:
 
     def receive_server_audio(self):
         self.playing_stream.start()
-        while True:
+        while not self.exiting:
             try:
                 voice_data = self.server_voice_socket.recv(shared.BYTES_PER_CHUNK)
                 self.playing_stream.write(voice_data)
             except WindowsError as e:
                 if not self.exiting:
+                    self.close()
                     print("Error with voice socket: %s, closing data and voice connections." % (e,))
-                    self.server_voice_socket.close()
-                    self.server_data_socket.close()
                 break
             except Exception as e:
                 if not self.exiting:
-                    print("Error: " + str(e))
+                    self.close()
+                    print("Error receiving audio: " + str(e))
                 break
 
     def send_client_audio(self):
         self.recording_stream.start()
-        while True:
+        while not self.exiting:
             try:
                 data = self.recording_stream.read(shared.BYTES_PER_CHUNK)[0]
                 rms = audioop.rms(data, 2)
                 if rms > 50:
                     self.server_voice_socket.sendall(data)
             except Exception as e:
-                self.server_voice_socket.close()
                 if not self.exiting:
+                    self.close()
                     print("Error sending audio: " + str(e))
                 break
 
@@ -180,12 +197,12 @@ class Client:
     def read_memory(self):
         self._poll_among_us()
 
-        while True:
+        while not self.exiting:
             try:
                 memory_read = self.among_us_memory.read()
                 if memory_read.local_player:
                     player_id = memory_read.local_player.playerId
-                    if not self.server_player_id or self.server_player_id != player_id:
+                    if self.server_player_id != player_id:
                         self.send(shared.UserInfoPacket(playerId=player_id))  # update the server with our new player ID
                         self.server_player_id = player_id
 
@@ -205,7 +222,6 @@ class Client:
             print('Unknown command :(')
 
     def exit_command(self, args):
-        self.exiting = True
         self.close()
         exit()
 
