@@ -5,6 +5,7 @@ import enum
 import re
 import yaml
 import struct
+import numpy as np
 
 pymem.logger.setLevel(pymem.logging.ERROR)
 
@@ -17,7 +18,7 @@ class Player:
     exiled: bool
     isLocal: bool
     inVent: bool
-    pos: tuple[float, float]
+    pos: np.ndarray
 
 class GameState(enum.Enum):
     MENU = 0
@@ -57,7 +58,8 @@ class AmongUsMemory:
 
     def open_process(self):
         try:
-            del self.pm
+            if self.pm:
+                self.pm.close_process()
             self.pm = pymem.Pymem("Among Us.exe")
             self.base_addr = pymem.process.module_from_name(self.pm.process_handle, "GameAssembly.dll").lpBaseOfDll
             return True
@@ -147,7 +149,7 @@ class AmongUsMemory:
             dead=values['dead'],
             inVent=in_vent,
             isLocal=is_local,
-            pos=(x_pos, y_pos),
+            pos=np.array((x_pos, y_pos), dtype=np.float),
         )
 
     def _get_position_offsets(self, is_local):
