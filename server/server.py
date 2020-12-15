@@ -171,7 +171,7 @@ class Server:
 
             if gain > 0:
                 if final_audio:
-                    source_audio = source_audio.apply_gain(10*np.log10(gain))
+                    #source_audio = source_audio.apply_gain(10*np.log10(gain))
                     final_audio = final_audio.overlay(source_audio)
                 else:
                     final_audio = source_audio
