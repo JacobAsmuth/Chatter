@@ -32,12 +32,14 @@ class Server:
 
     def bind_voice(self, port):
         self.voice_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.voice_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.voice_socket.bind((self.ip, port))
         self.voice_socket.listen(shared.MAX_CONCURRENT_CONNECTIONS)
         self.voice_port = port
 
     def bind_data(self, port):
         self.data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.data_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.data_socket.bind((self.ip, port))
         self.data_socket.listen(shared.MAX_CONCURRENT_CONNECTIONS)
         self.data_port = port
@@ -167,7 +169,7 @@ class Server:
 
             gain = destination_client.audio_levels_map[source_client.player_id]
 
-            if gain != 0:
+            if gain > 0:
                 if final_audio:
                     source_audio = source_audio.apply_gain(10*np.log10(gain))
                     final_audio = final_audio.overlay(source_audio)
