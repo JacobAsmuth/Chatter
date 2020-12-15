@@ -28,6 +28,7 @@ class Server:
             'clients': self.clients_command,
             'update': self.update_settings_command,
         }
+        self.closing = False
 
     def bind_voice(self, port):
         self.voice_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -70,44 +71,50 @@ class Server:
                 print(str(e))
 
     def receive_voice_connections(self):
-        while True:
-            socket, _ = self.voice_socket.accept()
-            with self.clients_lock:
+        while not self.closing:
+            try:
+                socket, _ = self.voice_socket.accept()
+                with self.clients_lock:
+                    user_id = self.user_id_from_socket(socket)
+                    if not user_id:
+                        continue
+        
+                    client = ClientObject(socket, user_id)
+                    self.clients[user_id] = client
+                    print("Received new voice client: %s" % (client.user_id,))
+
+                    # The client waits for this message after voice connection.
+                    # This makes sure we don't attempt data connection before client object is in memory
+                    try:
+                        socket.send("Ready for data connection!".encode(shared.ENCODING))
+                    except:
+                        client.close()
+            except Exception as e:
+                print("Error in voice connections: %s" % (e,))
+
+    def receive_data_connections(self):
+        while not self.closing:
+            try:
+                socket, addr = self.data_socket.accept()
+                str_addr = addr[0] + ':' + str(addr[1])
+
+                print("New data connection from %s" % (str_addr,))
+
                 user_id = self.user_id_from_socket(socket)
                 if not user_id:
                     continue
-    
-                client = ClientObject(socket, user_id)
-                self.clients[user_id] = client
-                print("Received new voice client: %s" % (client.user_id,))
 
-                # The client waits for this message after voice connection.
-                # This makes sure we don't attempt data connection before client object is in memory
-                try:
-                    socket.send("Ready for data connection!".encode(shared.ENCODING))
-                except:
-                    client.close()
-
-    def receive_data_connections(self):
-        while True:
-            socket, addr = self.data_socket.accept()
-            str_addr = addr[0] + ':' + str(addr[1])
-
-            print("New data connection from %s" % (str_addr,))
-
-            user_id = self.user_id_from_socket(socket)
-            if not user_id:
-                continue
-
-            with self.clients_lock:
-                for client in self.clients.values():
-                    if client.user_id == user_id:
-                        print("Matching voice socket found! (%s)" % (user_id,))
-                        client.set_data_socket(socket)
-                        break
-                else:  # loop did not break
-                    print("Could not find user_id(%s) from %s, closing socket." % (user_id, str_addr,))
-                    socket.close()
+                with self.clients_lock:
+                    for client in self.clients.values():
+                        if client.user_id == user_id:
+                            print("Matching voice socket found! (%s)" % (user_id,))
+                            client.set_data_socket(socket)
+                            break
+                    else:  # loop did not break
+                        print("Could not find user_id(%s) from %s, closing socket." % (user_id, str_addr,))
+                        socket.close()
+            except Exception as e: 
+                print("Error in data connections: %s" % (e,))
 
     def user_id_from_socket(self, socket):
         try:
@@ -161,10 +168,8 @@ class Server:
             gain = destination_client.audio_levels_map[source_client.player_id]
 
             if gain != 0:
-                #new_audio = source_audio - gain  # gain is in percent. Log10(gain) converts to DB.
                 if final_audio:
-                    #source_audio = source_audio.apply_gain(np.log10(gain*100))
-                    
+                    source_audio = source_audio.apply_gain(10*np.log10(gain))
                     final_audio = final_audio.overlay(source_audio)
                 else:
                     final_audio = source_audio
@@ -186,6 +191,7 @@ class Server:
             print('Unknown command :(')
 
     def exit_command(self, args):
+        self.closing = True
         self.data_socket.close()
         self.voice_socket.close()
         exit()
