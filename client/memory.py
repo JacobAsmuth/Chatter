@@ -58,8 +58,6 @@ class AmongUsMemory:
 
     def open_process(self):
         try:
-            if self.pm:
-                self.pm.close_process()
             self.pm = pymem.Pymem("Among Us.exe")
             self.base_addr = pymem.process.module_from_name(self.pm.process_handle, "GameAssembly.dll").lpBaseOfDll
             return True
