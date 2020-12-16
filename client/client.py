@@ -203,7 +203,7 @@ class Client:
                         self.server_player_id = player_id
 
                 self.send(self.audio_engine.get_audio_levels(memory_read))
-                sleep(0.2)
+                sleep(0.05)
             except Exception as e:
                 print(e)
                 sleep(5)

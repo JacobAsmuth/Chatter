@@ -29,10 +29,8 @@ class ArrayMixer(AudioMixerBase):
             if final_sample == None:
                 final_sample = fragment
             else:
-                if len(final_sample) != len(fragment):
-                    print('dropped audio sample to ', destination_client.user_id)
-                    continue
-                final_sample = audioop.add(final_sample, fragment, shared.SAMPLE_WIDTH)
+                shorter_length = min(len(final_sample), len(fragment))
+                final_sample = audioop.add(final_sample[:shorter_length], fragment[:shorter_length], shared.SAMPLE_WIDTH)
         
 
         return final_sample

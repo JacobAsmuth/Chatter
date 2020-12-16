@@ -131,7 +131,7 @@ class Server:
         return None
             
     def collect_voice(self):
-        while True:
+        while not self.closing:
                 all_voice_data = {}
                 to_remove = []
                 with self.clients_lock:
