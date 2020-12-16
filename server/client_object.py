@@ -38,6 +38,7 @@ class ClientObject:
         threading.Thread(target=self.send_data_to_client, daemon=True).start()
 
     def send_data_to_client(self):
+        object_to_send = None
         while True:
             try:
                 object_to_send = self.send_queue.get_nowait()
@@ -75,6 +76,5 @@ class ClientObject:
         self.player_id = packet.playerId
 
     def audio_levels_packet_handler(self, packet: shared.AudioLevelsPacket):
-        print(self.player_id, "sent", str(packet))
         for player_id, gain in zip(packet.playerIds, packet.gains):
             self.audio_levels_map[player_id] = gain

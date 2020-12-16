@@ -33,4 +33,4 @@ class ArrayMixer(AudioMixerBase):
                 final_sample = audioop.add(final_sample[:shorter_length], fragment[:shorter_length], shared.SAMPLE_WIDTH)
         
 
-        return final_sample
+        return audioop.mul(final_sample, shared.SAMPLE_WIDTH, 1.5)
