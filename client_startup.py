@@ -1,8 +1,8 @@
 import sys
-from client.client import Client # pylint: disable-msg=E0611
+from client.client import Client
 import client.memory as memory
 import shared
-from client.audio_engines.linear import Linear # pylint: disable-msg=E0611
+from client.audio_engines.linear import Linear
 
 
 def main(args):

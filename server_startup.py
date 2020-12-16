@@ -1,8 +1,10 @@
-from server.server import Server  # pylint: disable-msg=E0611
+from server.server import Server
 import shared
+from server.audio_mixers.pydub_mixer import PydubMixer
+from server.audio_mixers.array_mixer import ArrayMixer
 
 def main():
-    server = Server()
+    server = Server(ArrayMixer())
     try:
         server.bind_voice(shared.VOICE_PORT)
         server.bind_data(shared.DATA_PORT)
