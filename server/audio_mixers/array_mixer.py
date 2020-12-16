@@ -38,5 +38,4 @@ class ArrayMixer(AudioMixerBase):
                     final_sample += bytes(0 for _ in range(-delta))
                 final_sample = audioop.add(final_sample, fragment, shared.SAMPLE_WIDTH)
         
-
-        return audioop.mul(final_sample, shared.SAMPLE_WIDTH, destination_client.volume)
+        return audioop.mul(final_sample, shared.SAMPLE_WIDTH, len(samples) * destination_client.volume)
