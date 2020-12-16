@@ -1,21 +1,24 @@
 #external libs
 import socket
 import threading
-import numpy as np
-import pickle
-import queue
 import time
+import importlib
 import pydub
+import struct
 # internal libs
 from server.client_object import ClientObject
+from server.audio_mixers.base import AudioMixerBase
+import server.audio_mixers.array_mixer as array_mixer
+import server.audio_mixers.pydub_mixer as pydub_mixer
 import shared
-import io
 from sys import exit
 
 
 class Server:
-    def __init__(self):
+    def __init__(self, audio_mixer: AudioMixerBase):
         self.ip = socket.gethostbyname(socket.gethostname())
+        self.audio_mixer = audio_mixer
+        self.audio_mixer_lock = threading.Lock()
         self.voice_port = None
         self.data_port = None
         self.voice_socket = None
@@ -27,6 +30,7 @@ class Server:
             'help': self.help_command,
             'clients': self.clients_command,
             'update': self.update_settings_command,
+            'mixer': self.change_audio_mixer_command,
         }
         self.closing = False
 
@@ -155,35 +159,21 @@ class Server:
                 if len(all_voice_data) <= 1:
                     continue
 
-                with self.clients_lock:
-                    for client in self.clients.values():
-                        self.broadcast_voice(client, all_voice_data)
+                with self.audio_mixer_lock:
+                    with self.clients_lock:
+                        for client in self.clients.values():
+                            self.broadcast_voice(client, all_voice_data)
 
     def broadcast_voice(self, destination_client: ClientObject, all_voice_data: dict):
-
-        final_audio = None
-
-        for source_client, source_audio in all_voice_data.items():
-            if source_client is destination_client:
-                continue
-
-            gain = destination_client.audio_levels_map[source_client.player_id]
-
-            if gain > 0:
-                if final_audio:
-                    #source_audio = source_audio.apply_gain(10*np.log10(gain))
-                    final_audio = final_audio.overlay(source_audio)
-                else:
-                    final_audio = source_audio
-
-        if not final_audio:
+        final_audio = self.audio_mixer.mix(destination_client, all_voice_data)
+        if final_audio is None:
             return
 
         try:
-            destination_client.voice_socket.send(final_audio.raw_data)
+            destination_client.voice_socket.send(final_audio)
         except Exception as e:
             print("Error sending final audio: " + str(e))
-            destination_client.close()
+            destination_client.close()       
 
     def run_command(self, command):
         if command[0] in self.command_map:
@@ -192,21 +182,30 @@ class Server:
         else:
             print('Unknown command :(')
 
-    def exit_command(self, args):
+    def exit_command(self, _):
         self.closing = True
         self.data_socket.close()
         self.voice_socket.close()
         exit()
 
-    def help_command(self, args):
+    def help_command(self, _):
         print('Available commands: ')
         for command in self.command_map.keys():
             print(command)
 
-    def clients_command(self, args):
+    def clients_command(self, _):
         for client in self.clients:
             print(client)
 
-    def update_settings_command(self, args):
+    def update_settings_command(self, _):
         for client in self.clients.values():
             client.send(shared.ServerSettingsPacket(1, 2))
+
+    def change_audio_mixer_command(self, args):
+        mixer_map = {
+            'pydub': (pydub_mixer, pydub_mixer.PydubMixer),
+            'array': (array_mixer, array_mixer.ArrayMixer),
+        }
+        importlib.reload(mixer_map[args[0]][0])
+        with self.audio_mixer_lock:
+            self.audio_mixer = mixer_map[args[0]][1]()
