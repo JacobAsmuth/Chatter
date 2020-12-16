@@ -17,8 +17,8 @@ class Linear(base.AudioEngineBase):
         max_dist = self.max_dist
 
         for p in memory_read.players:
-            dist = np.linalg.norm(lp_pos - p.pos)
-            gain = (1-(max_dist-dist)) * (dist < max_dist) # branchless. If dist >= max_dist, multiply by 0, otherwise keep the value.
+            dist = abs(np.linalg.norm(lp_pos - p.pos))
+            gain = (1-(dist/max_dist)) * (dist < max_dist) # branchless. If dist >= max_dist, multiply by 0, otherwise keep the value.
 
             player_ids.append(p.playerId)
             gains.append(gain)

@@ -30,6 +30,7 @@ class ArrayMixer(AudioMixerBase):
                 final_sample = fragment
             else:
                 if len(final_sample) != len(fragment):
+                    print('dropped audio sample to ', destination_client.user_id)
                     continue
                 final_sample = audioop.add(final_sample, fragment, shared.SAMPLE_WIDTH)
         

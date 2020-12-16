@@ -43,6 +43,7 @@ class Client:
 
     def connect(self, ip, voice_port, data_port):
         self.exiting = False
+        self.server_player_id = None
         self.ip = ip
         self.voice_port = voice_port
         self.data_port = data_port
@@ -202,7 +203,7 @@ class Client:
                         self.server_player_id = player_id
 
                 self.send(self.audio_engine.get_audio_levels(memory_read))
-                sleep(1)
+                sleep(0.2)
             except Exception as e:
                 print(e)
                 sleep(5)
