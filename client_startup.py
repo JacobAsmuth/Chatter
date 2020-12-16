@@ -10,7 +10,11 @@ def main(args):
     linear_audio = Linear()
 
     client = Client(mem, linear_audio)
-    client.connect(args[0], shared.VOICE_PORT, shared.DATA_PORT)
+    if len(args) == 0:
+        ip = input("Please enter the IP address to connect to: ")
+        client.connect(ip, shared.VOICE_PORT, shared.DATA_PORT)
+    else:
+        client.connect(args[0], shared.VOICE_PORT, shared.DATA_PORT)
     client.wait_for_commands()
 
 
