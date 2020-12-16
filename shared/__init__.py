@@ -1,6 +1,6 @@
 import pickle
 from dataclasses import dataclass
-from typing import List
+from typing import List, Any
 
 VOICE_PORT = 5555
 DATA_PORT = 6666
@@ -32,3 +32,15 @@ class ServerSettingsPacket:
 class AudioLevelsPacket:
     playerIds: List[int]
     gains: List[float]
+
+@dataclass
+class VolumePacket:
+    volume: float
+
+@dataclass
+class OffsetsRequestPacket:
+    pass
+
+@dataclass
+class OffsetsResponsePacket:
+    offsets: Any

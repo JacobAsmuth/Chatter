@@ -4,7 +4,7 @@ import threading
 import time
 import importlib
 import pydub
-import struct
+import yaml
 # internal libs
 from server.client_object import ClientObject
 from server.audio_mixers.base import AudioMixerBase
@@ -33,6 +33,8 @@ class Server:
             'mixer': self.change_audio_mixer_command,
         }
         self.closing = False
+        with open("server/offsets/offsets.yaml", 'r') as f:
+            self.offsets = yaml.load(f, Loader=yaml.FullLoader)
 
     def bind_voice(self, port):
         self.voice_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -85,7 +87,7 @@ class Server:
                     if not user_id:
                         continue
         
-                    client = ClientObject(socket, user_id)
+                    client = ClientObject(socket, user_id, self.offsets)
                     self.clients[user_id] = client
                     print("Received new voice client: %s" % (client.user_id,))
 
@@ -96,7 +98,8 @@ class Server:
                     except:
                         client.close()
             except Exception as e:
-                print("Error in voice connections: %s" % (e,))
+                if not self.closing:
+                    print("Error in voice connections: %s" % (e,))
 
     def receive_data_connections(self):
         while not self.closing:
@@ -120,7 +123,8 @@ class Server:
                         print("Could not find user_id(%s) from %s, closing socket." % (user_id, str_addr,))
                         socket.close()
             except Exception as e: 
-                print("Error in data connections: %s" % (e,))
+                if not self.closing:
+                    print("Error in data connections: %s" % (e,))
 
     def user_id_from_socket(self, socket):
         try:

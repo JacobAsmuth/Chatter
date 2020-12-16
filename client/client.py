@@ -23,6 +23,7 @@ class Client:
         self.data_port = None
         self.user_id = uuid.uuid4()
         self.server_player_id = None
+        self.settings = shared.ServerSettingsPacket(0, 0)
 
         self.server_voice_socket = None
         self.server_data_socket = None
@@ -34,11 +35,13 @@ class Client:
             'exit': self.exit_command,
             'ping': self.ping_command,
             'retry': self.retry_command,
+            'volume': self.volume_command,
         }
 
         self.packet_handlers = {
             shared.PingPacket: self.ping_packet_handler,
-            shared.ServerSettingsPacket: self.server_settings_packet_handler
+            shared.ServerSettingsPacket: self.server_settings_packet_handler,
+            shared.OffsetsResponsePacket: self.offsets_response_packet_handler,
         }
 
     def connect(self, ip, voice_port, data_port):
@@ -191,7 +194,11 @@ class Client:
         print("Found Among Us.exe!")       
 
     def read_memory(self):
+        self.send(shared.OffsetsRequestPacket())
         self._poll_among_us()
+        while not self.among_us_memory.has_offsets():
+            print("Waiting for offsets from server...")
+            sleep(1)
 
         while not self.exiting:
             try:
@@ -202,7 +209,7 @@ class Client:
                         self.send(shared.UserInfoPacket(playerId=player_id))  # update the server with our new player ID
                         self.server_player_id = player_id
 
-                self.send(self.audio_engine.get_audio_levels(memory_read))
+                    self.send(self.audio_engine.get_audio_levels(memory_read))
                 sleep(0.05)
             except Exception as e:
                 print(e)
@@ -233,8 +240,18 @@ class Client:
     def ping_command(self, _):
         self.send(shared.PingPacket())
 
-    def ping_packet_handler(self, packet):
+    def volume_command(self, args):
+        volume = float(args[1])
+        self.send(shared.VolumePacket(volume))
+
+    def ping_packet_handler(self, packet: shared.PingPacket):
         print("Ping Received!")
 
-    def server_settings_packet_handler(self, packet):
-        print(packet)
+    def server_settings_packet_handler(self, packet: shared.ServerSettingsPacket):
+        for field in packet.__dataclass_fields__:
+             val = getattr(packet, field)
+             if val is not None:
+                 setattr(self.settings, field, val)
+
+    def offsets_response_packet_handler(self, packet: shared.OffsetsResponsePacket):
+        self.among_us_memory.set_offsets(packet.offsets)

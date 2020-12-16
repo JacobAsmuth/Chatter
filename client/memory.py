@@ -3,11 +3,10 @@ from typing import List
 from dataclasses import dataclass
 import enum
 import re
-import yaml
 import struct
 import numpy as np
 
-pymem.logger.setLevel(pymem.logging.ERROR)
+pymem.logger.setLevel(pymem.logging.CRITICAL)
 
 @dataclass
 class Player:
@@ -38,12 +37,15 @@ class AmongUsMemory:
     def __init__(self):
         self.pm = None
         self.exile_causes_end = False
-        self.offsets = self._load_offsets()
+        self.offsets = None
+        self.struct_format = None
+
+    def set_offsets(self, offsets):
+        self.offsets = offsets
         self.struct_format = self._struct_format_from_offsets()
 
-    def _load_offsets(self):
-        with open("client/offsets/offsets.yml", mode='r') as f:
-            return yaml.load(f, Loader=yaml.FullLoader)
+    def has_offsets(self) -> bool:
+        return self.offsets is not None and self.struct_format is not None
 
     def read(self):
         if not self.pm:

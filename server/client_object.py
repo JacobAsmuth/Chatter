@@ -5,12 +5,14 @@ import socket
 import collections
 import pickle
 import time
+from typing import Any
 
 class ClientObject:
-    def __init__(self, voice_socket: socket.socket, user_id: str):
+    def __init__(self, voice_socket: socket.socket, user_id: str, offsets: Any):
         self.user_id = user_id
         self.voice_socket = voice_socket
-
+        self.volume = 1
+        self.offsets = offsets
         self.closing = False
         self.player_id = None  # In-game player ID
         self.data_socket = None
@@ -20,6 +22,8 @@ class ClientObject:
             shared.PingPacket: self.ping_packet_handler,
             shared.UserInfoPacket: self.user_info_packet_handler,
             shared.AudioLevelsPacket: self.audio_levels_packet_handler,
+            shared.OffsetsRequestPacket: self.offsets_request_packet_handler,
+            shared.VolumePacket: self.volume_packet_handler,
         }
 
     def close(self):
@@ -78,3 +82,9 @@ class ClientObject:
     def audio_levels_packet_handler(self, packet: shared.AudioLevelsPacket):
         for player_id, gain in zip(packet.playerIds, packet.gains):
             self.audio_levels_map[player_id] = gain
+
+    def offsets_request_packet_handler(self, _: shared.OffsetsRequestPacket):
+        self.send(shared.OffsetsResponsePacket(self.offsets))
+
+    def volume_packet_handler(self, packet: shared.VolumePacket):
+        self.volume = packet.volume

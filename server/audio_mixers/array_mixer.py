@@ -29,8 +29,14 @@ class ArrayMixer(AudioMixerBase):
             if final_sample == None:
                 final_sample = fragment
             else:
-                shorter_length = min(len(final_sample), len(fragment))
-                final_sample = audioop.add(final_sample[:shorter_length], fragment[:shorter_length], shared.SAMPLE_WIDTH)
+                final_sample_len = len(final_sample)
+                fragment_len = len(fragment)
+                delta = final_sample_len - fragment_len
+                if delta > 0:  # final sample bigger
+                    fragment += bytes(0 for _ in range(delta))
+                elif delta < 0:  # fragment bigger
+                    final_sample += bytes(0 for _ in range(-delta))
+                final_sample = audioop.add(final_sample, fragment, shared.SAMPLE_WIDTH)
         
 
-        return audioop.mul(final_sample, shared.SAMPLE_WIDTH, 1.5)
+        return audioop.mul(final_sample, shared.SAMPLE_WIDTH, destination_client.volume)
