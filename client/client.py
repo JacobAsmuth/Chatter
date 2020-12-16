@@ -1,11 +1,7 @@
 import sounddevice
 import socket
 import threading
-import audioop
-import subprocess
-import platform
 import pickle
-import sys
 from queue import Queue, Empty
 from time import sleep
 import sounddevice
@@ -138,6 +134,7 @@ class Client:
                 break
 
     def send_client_data(self):
+        object_to_send = None
         while not self.exiting:
             try:
                 object_to_send = self.send_queue.get_nowait()
@@ -176,10 +173,8 @@ class Client:
         self.recording_stream.start()
         while not self.exiting:
             try:
-                data = self.recording_stream.read(shared.BYTES_PER_CHUNK)[0]
-                rms = audioop.rms(data, 2)
-                if rms > 50:
-                    self.server_voice_socket.sendall(data)
+                data = self.recording_stream.read(shared.SAMPLES_PER_CHUNK)[0]
+                self.server_voice_socket.sendall(data)
             except Exception as e:
                 if not self.exiting:
                     self.close()
@@ -221,20 +216,20 @@ class Client:
         else:
             print('Unknown command :(')
 
-    def exit_command(self, args):
+    def exit_command(self, _):
         self.close()
         exit()
 
-    def retry_command(self, args):
+    def retry_command(self, _):
         self.close()
         self.connect(self.ip, self.voice_port, self.data_port)
 
-    def help_command(self, args):
+    def help_command(self, _):
         print('Available commands: ')
         for command in self.command_map.keys():
             print(command)
     
-    def ping_command(self, args):
+    def ping_command(self, _):
         self.send(shared.PingPacket())
 
     def ping_packet_handler(self, packet):

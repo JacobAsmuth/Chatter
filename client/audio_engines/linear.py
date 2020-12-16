@@ -1,5 +1,4 @@
 import shared
-from typing import List
 import client.memory as memory
 import client.audio_engines.base as base
 import numpy as np
@@ -19,7 +18,7 @@ class Linear(base.AudioEngineBase):
 
         for p in memory_read.players:
             dist = np.linalg.norm(lp_pos - p.pos)
-            gain = (1-(dist-max_dist)) * (dist < max_dist) # branchless. If dist >= max_dist, multiply by 0, otherwise keep the value.
+            gain = (1-(max_dist-dist)) * (dist < max_dist) # branchless. If dist >= max_dist, multiply by 0, otherwise keep the value.
 
             player_ids.append(p.playerId)
             gains.append(gain)

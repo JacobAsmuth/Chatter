@@ -1,5 +1,4 @@
 import abc
-from typing import List
 
 import shared
 import client.memory as memory
