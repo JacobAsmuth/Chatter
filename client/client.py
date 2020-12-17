@@ -208,11 +208,12 @@ class Client:
                     if self.server_player_id != player_id:
                         self.send(shared.UserInfoPacket(playerId=player_id))  # update the server with our new player ID
                         self.server_player_id = player_id
+                    self.send(self.audio_engine.get_audio_levels(memory_read))
                 elif self.server_player_id:  # no local player but the server thinks there is one
                     self.send(shared.UserInfoPacket(player_id=None))
+                    self.server_player_id = None
 
 
-                    self.send(self.audio_engine.get_audio_levels(memory_read))
                 sleep(0.05)
             except Exception as e:
                 print(e)
