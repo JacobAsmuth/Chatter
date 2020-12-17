@@ -29,9 +29,7 @@ class ArrayMixer(AudioMixerBase):
             if final_sample == None:
                 final_sample = fragment
             else:
-                final_sample_len = len(final_sample)
-                fragment_len = len(fragment)
-                delta = final_sample_len - fragment_len
+                delta = len(final_sample) - len(fragment)
                 if delta > 0:  # final sample bigger
                     fragment += bytes(0 for _ in range(delta))
                 elif delta < 0:  # fragment bigger
