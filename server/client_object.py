@@ -30,14 +30,12 @@ class ClientObject:
         }
         self.last_updated = time()
         self.volume = 1.0
-        self.frame_id = 0
 
     def send_voice(self, data) -> None:
         encoded_audio, self.encoding_state = audioop.lin2adpcm(data, consts.BYTES_PER_SAMPLE, self.encoding_state)
-        packet = packets.ServerVoiceFramePacket(self.frame_id, encoded_audio)
+        packet = packets.ServerVoiceFramePacket(time(), encoded_audio)
         packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
         self.voice_socket.sendto(packet_bytes, self.voice_address)
-        self.frame_id += 1
 
     def send_data(self, packet) -> None:
         packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)

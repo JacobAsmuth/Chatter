@@ -2,7 +2,7 @@ import sounddevice
 import socket
 import threading
 import pickle
-from time import sleep
+from time import sleep, time
 import sounddevice
 import numpy as np
 import random
@@ -31,7 +31,6 @@ class Client:
         self.encoding_state = None
         self.decoding_state = None
         self.send_data_lock = Lock()
-        self.frame_id = 0
         self.voice_buffer = JitterBuffer(consts.MIN_BUFFER_SIZE, consts.MAX_BUFFER_SIZE)
 
         self.server_voice_socket = None
@@ -50,7 +49,6 @@ class Client:
         }
 
     def connect(self, ip, voice_port, data_port):
-        self.frame_id = 0
         self.exiting = False
         self.ip = ip
         self.voice_port = voice_port
@@ -162,11 +160,10 @@ class Client:
             try:
                 raw_audio = self.recording_stream.read(consts.SAMPLES_PER_CHUNK)[0]
                 encoded_audio, self.encoding_state = audioop.lin2adpcm(raw_audio, consts.BYTES_PER_SAMPLE, self.encoding_state)
-                packet = packets.ClientVoiceFramePacket(frameId=self.frame_id, clientId=self.client_id, voiceData=encoded_audio)
+                packet = packets.ClientVoiceFramePacket(frameId=time(), clientId=self.client_id, voiceData=encoded_audio)
                 packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
 
                 self.server_voice_socket.sendto(packet_bytes, self.voice_addr)
-                self.frame_id += 1
                 self.sent_audio = True
             except Exception as e:
                 if not self.exiting:
@@ -196,14 +193,9 @@ class Client:
 
     def play_audio_loop(self):
         self.playing_stream.start()
-        expected_frame_id = 0
         while not self.exiting:
             samples = self.voice_buffer.get_samples()
             if samples is not None:
-                #print("Adding sample %d" % (self.voice_buffer.expected_next_frame_id-1))
-                if expected_frame_id != self.voice_buffer.expected_next_frame_id-1:
-                    print("Skipped from frame %d to %s" % (expected_frame_id, self.voice_buffer.expected_next_frame_id-1))
-                expected_frame_id = self.voice_buffer.expected_next_frame_id
                 self.playing_stream.write(samples)
             sleep(consts.OUTPUT_BLOCK_TIME)
 

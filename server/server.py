@@ -58,42 +58,39 @@ class Server:
         threading.Thread(target=self.receive_data_loop, daemon=True).start()
         threading.Thread(target=self.send_voice_loop, daemon=True).start()
 
-    def wait_for_commands(self):
-        print("Accepting new connections. Type help for available commands.")
-        while True:
-            try:
-                cmd = input("$ ")
-            except KeyboardInterrupt:
-                print("Please run 'exit' instead.")
-                continue
-
-            try:
-                self.run_command(cmd.split(' '))
-            except Exception as e:
-                print(str(e))
-
-    def get_client_object(self, client_id: int, voice_address=None, data_address=None) -> ClientObject:
-        if client_id not in self.clients:
-            print("Received new client: %d" % (client_id,))
+    def send_voice_loop(self):
+        while not self.closing:
+            to_remove = []
+            voice_data = {}
+            cur_time = time()
             with self.clients_lock:
-                client = ClientObject(client_id,
-                                        self.offsets,
-                                        self.data_socket,
-                                        self.voice_socket,
-                                        self.join_id,
-                                        voice_address=voice_address,
-                                        data_address=data_address)
-                self.join_id += 1
-                self.clients[client_id] = client
-                return client
-        else:
-            client: ClientObject = self.clients[client_id]
-            if client.voice_address is None:
-                client.voice_address = voice_address
-            elif client.data_address is None:
-                client.data_address = data_address
-        
-        return self.clients[client_id]
+                for client in self.clients.values():
+                    if cur_time - client.last_updated > consts.CLEANUP_TIMEOUT:
+                        to_remove.append(client)
+                        continue
+                    client_voice_data = client.read_voice_data()
+                    if client_voice_data is not None:
+                        voice_data[client] = client_voice_data
+
+                for client in to_remove:
+                    print("removed client %d" % (client.join_id,))
+                    del self.clients[client.client_id]
+                    
+            # voice to send to anyone else
+            if len(voice_data) > 1:
+                with self.audio_mixer_lock and self.clients_lock:
+                    for client in self.clients.values():
+                        if client.voice_address is None:
+                            continue
+                        final_audio = self.audio_mixer.mix(client, voice_data)
+                        if final_audio is None:
+                            continue
+                        try:
+                            for i in range(0, len(final_audio), consts.PACKET_SIZE):
+                                client.send_voice(final_audio[i:i+consts.PACKET_SIZE])
+                        except Exception as e:
+                            print("Error sending final audio: " + str(e))
+            sleep(consts.OUTPUT_BLOCK_TIME)
 
     def receive_voice_loop(self):
         while not self.closing:
@@ -115,43 +112,6 @@ class Server:
             except Exception as e: 
                 if not self.closing:
                     print("Error in data connections: %s" % (e,))
-            
-    def send_voice_loop(self):
-        while not self.closing:
-            to_remove = []
-            voice_data = {}
-            cur_time = time()
-            with self.clients_lock:
-                for client in self.clients.values():
-                    if cur_time - client.last_updated > consts.CLEANUP_TIMEOUT:
-                        to_remove.append(client)
-                        continue
-                    client_voice_data = client.read_voice_data()
-                    if client_voice_data is not None:
-                        voice_data[client] = client_voice_data
-
-                for client in to_remove:
-                    print("removed client %d" % (client.join_id,))
-                    del self.clients[client.client_id]
-                    
-            # No voice to send to anyone else
-            if len(voice_data) <= 1:
-                continue
-
-            with self.audio_mixer_lock:
-                with self.clients_lock:
-                    for client in self.clients.values():
-                        if client.voice_address is None:
-                            continue
-                        final_audio = self.audio_mixer.mix(client, voice_data)
-                        if final_audio is None:
-                            continue
-                        try:
-                            for i in range(0, len(final_audio), consts.PACKET_SIZE):
-                                client.send_voice(final_audio[i:i+consts.PACKET_SIZE])
-                        except Exception as e:
-                            print("Error sending final audio: " + str(e))
-            sleep(consts.OUTPUT_BLOCK_TIME)
 
     def run_command(self, command):
         if command[0] in self.command_map:
@@ -189,3 +149,41 @@ class Server:
         mixer_map[mixer] = (loaded_module, mixer_type_name)
         with self.audio_mixer_lock:
             self.audio_mixer = getattr(loaded_module, mixer_type_name)()
+
+
+    def wait_for_commands(self):
+        print("Accepting new connections. Type help for available commands.")
+        while True:
+            try:
+                cmd = input("$ ")
+            except KeyboardInterrupt:
+                print("Please run 'exit' instead.")
+                continue
+
+            try:
+                self.run_command(cmd.split(' '))
+            except Exception as e:
+                print(str(e))
+
+    def get_client_object(self, client_id: int, voice_address=None, data_address=None) -> ClientObject:
+        if client_id not in self.clients:
+            print("Received new client: %d" % (client_id,))
+            with self.clients_lock:
+                client = ClientObject(client_id,
+                                        self.offsets,
+                                        self.data_socket,
+                                        self.voice_socket,
+                                        self.join_id,
+                                        voice_address=voice_address,
+                                        data_address=data_address)
+                self.join_id += 1
+                self.clients[client_id] = client
+                return client
+        else:
+            client: ClientObject = self.clients[client_id]
+            if client.voice_address is None:
+                client.voice_address = voice_address
+            elif client.data_address is None:
+                client.data_address = data_address
+        
+        return self.clients[client_id]
