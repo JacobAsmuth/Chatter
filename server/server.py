@@ -36,15 +36,15 @@ class Server:
             self.offsets = yaml.load(f, Loader=yaml.FullLoader)
 
     def setup_voice(self, port):
-        self.voice_socket = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+        self.voice_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.voice_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.voice_socket.bind(("::1", port, 0, 0))
+        self.voice_socket.bind(("0.0.0.0", port, 0, 0))
         self.voice_port = port
 
     def setup_data(self, port):
-        self.data_socket = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+        self.data_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.data_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.data_socket.bind(("::1", port, 0, 0))
+        self.data_socket.bind(("0.0.0.0", port))
         self.data_port = port
 
     def listen(self):

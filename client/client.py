@@ -61,10 +61,10 @@ class Client:
         self.recording_stream = sounddevice.RawInputStream(channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16)
         self.playing_stream = sounddevice.RawOutputStream(channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16)
 
-        self.voice_addr = (self.ip, self.voice_port, 0, 0)
-        self.data_addr = (self.ip, self.data_port, 0, 0)
-        self.server_voice_socket = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
-        self.server_data_socket = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+        self.voice_addr = (self.ip, self.voice_port)
+        self.data_addr = (self.ip, self.data_port)
+        self.server_voice_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.server_data_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         print("Initializing microphone recording...")
         threading.Thread(target=self.send_audio_loop, daemon=True).start()
@@ -148,10 +148,10 @@ class Client:
             with self.send_data_lock:  # rarely contested, only when user initiates something
                 self.server_data_socket.sendto(val, self.data_addr)
             self.sent_data = True
-        except WindowsError:
+        except WindowsError as e:
             if not self.exiting:
                 self.close()
-                print("Remote server died :(")
+                print("Server died: %s" % (e,))
         except Exception as e:
             print("Unable to send %s: %s" % (packet, e))
                 
