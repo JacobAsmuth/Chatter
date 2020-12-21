@@ -196,10 +196,14 @@ class Client:
 
     def play_audio_loop(self):
         self.playing_stream.start()
-
+        expected_frame_id = 0
         while not self.exiting:
             samples = self.voice_buffer.get_samples()
             if samples is not None:
+                #print("Adding sample %d" % (self.voice_buffer.expected_next_frame_id-1))
+                if expected_frame_id != self.voice_buffer.expected_next_frame_id-1:
+                    print("Skipped from frame %d to %s" % (expected_frame_id, self.voice_buffer.expected_next_frame_id-1))
+                expected_frame_id = self.voice_buffer.expected_next_frame_id
                 self.playing_stream.write(samples)
             sleep(consts.OUTPUT_BLOCK_TIME)
 
