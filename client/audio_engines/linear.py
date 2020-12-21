@@ -1,4 +1,5 @@
-import shared
+from typing import List
+
 import client.memory as memory
 import client.audio_engines.base as base
 import numpy as np
@@ -8,9 +9,9 @@ class Linear(base.AudioEngineBase):
         super(Linear, self).__init__()
         self.max_dist = 3
 
-    def get_audio_levels(self, memory_read: memory.MemoryRead) -> shared.AudioLevelsPacket:
+    def get_audio_levels(self, memory_read: memory.MemoryRead) -> tuple[List[int], List[int]]:
         if not memory_read.local_player:
-            return shared.AudioLevelsPacket(playerIds=[], gains=[])
+            return [], []
         player_ids = []
         gains = []
         lp_pos = memory_read.local_player.pos
@@ -23,4 +24,4 @@ class Linear(base.AudioEngineBase):
             player_ids.append(p.playerId)
             gains.append(gain)
 
-        return shared.AudioLevelsPacket(playerIds=player_ids, gains=gains)
+        return player_ids, gains

@@ -1,90 +1,75 @@
-import shared
-import threading
-import queue
-import socket
+import shared.consts as consts
+import shared.packets as packets
+from time import time
 import collections
+import io
+import socket
 import pickle
-import time
-from typing import Any
+import audioop
 
 class ClientObject:
-    def __init__(self, voice_socket: socket.socket, user_id: str, offsets: Any):
-        self.user_id = user_id
+    def __init__(self, client_id: str, offsets: str, data_socket: socket.socket, voice_socket: socket.socket, join_id: int, voice_address=None, data_address=None):
+        self.voice_address = voice_address
+        self.data_address = data_address
+        self.join_id = join_id
+        self.data_socket = data_socket
         self.voice_socket = voice_socket
-        self.volume = 1
+        self.client_id = client_id
+        self.encoding_state = None
+        self.decoding_state = None
         self.offsets = offsets
-        self.closing = False
         self.player_id = None  # In-game player ID
-        self.data_socket = None
-        self.send_queue = queue.Queue()
+        #self.voice_data = io.BytesIO()
+        self.voice_data = bytes()
         self.audio_levels_map = collections.defaultdict(float)
         self.packet_handlers = {
-            shared.PingPacket: self.ping_packet_handler,
-            shared.UserInfoPacket: self.user_info_packet_handler,
-            shared.AudioLevelsPacket: self.audio_levels_packet_handler,
-            shared.OffsetsRequestPacket: self.offsets_request_packet_handler,
-            shared.VolumePacket: self.volume_packet_handler,
+            packets.AudioLevelsPacket: self.audio_levels_packet_handler,
+            packets.OffsetsRequestPacket: self.offsets_request_packet_handler,
+            packets.VolumePacket: self.volume_packet_handler,
         }
+        self.last_updated = time()
+        self.volume = 1.0
+        self.frame_id = 0
 
-    def close(self):
-        self.closing = True
+    def send_voice(self, data) -> None:
+        encoded_audio, self.encoding_state = audioop.lin2adpcm(data, consts.BYTES_PER_SAMPLE, self.encoding_state)
+        packet = packets.ServerVoiceFramePacket(self.frame_id, encoded_audio)
+        packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
+        self.voice_socket.sendto(packet_bytes, self.voice_address)
+        self.frame_id += 1
 
-        while not self.send_queue.empty():
-            self.send_queue.get()
+    def send_data(self, packet) -> None:
+        packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
+        self.data_socket.sendto(packet_bytes, self.data_address)
 
-        self.voice_socket.close()
-        if self.data_socket:
-            self.data_socket.close()
+    def add_voice_data(self, packet: packets.ClientVoiceFramePacket) -> None:
+        self.last_updated = time()
+        decoded, self.decoding_state = audioop.adpcm2lin(packet.voiceData, consts.BYTES_PER_SAMPLE, self.decoding_state)
+        #self.voice_data.write(decoded)
+        self.voice_data = decoded
 
-    def set_data_socket(self, data_socket: socket.socket):
-        self.data_socket = data_socket
-        threading.Thread(target=self.receive_data_from_client, daemon=True).start()
-        threading.Thread(target=self.send_data_to_client, daemon=True).start()
+    def read_voice_data(self) -> bytes:
+        #self.voice_data.seek(0)
+        #data = self.voice_data.read()
+        #self.voice_data = io.BytesIO()
+        data = self.voice_data
+        self.voice_data = bytes()
+        return data
 
-    def send_data_to_client(self):
-        object_to_send = None
-        while True:
-            try:
-                object_to_send = self.send_queue.get_nowait()
-                val = pickle.dumps(object_to_send, protocol=shared.PICKLE_PROTOCOL)
-                self.data_socket.sendall(val)
-            except queue.Empty:
-                time.sleep(0.1)
-            except Exception as e:
-                if not self.closing:
-                    print("Unable to send %s: %s" % (object_to_send, e))
-                break
+    def handle_packet(self, packet: packets.ClientPacket) -> None:
+        packet_type = type(packet)
+        if packet_type not in self.packet_handlers:
+            raise ValueError("Unknown packet type: %s" % (type(packet),))
 
-    def send(self, packet):
-        self.send_queue.put_nowait(packet)
+        self.packet_handlers[packet_type](packet)
 
-    def receive_data_from_client(self):
-        while True:
-            try:
-                packet = pickle.loads(self.data_socket.recv(1024))
-                packet_type = type(packet)
-                if packet_type in self.packet_handlers:
-                    self.packet_handlers[packet_type](packet)
-                else:
-                    print("Unkown packet: %s" % (packet,))
-            except Exception as e:
-                if not self.closing:
-                    print("Error parsing packet: %s, closing socket" % (e,))
-                    self.data_socket.close()
-                break
-
-    def ping_packet_handler(self, packet):
-        print("Ping from %s received!" % (self.user_id,))
-
-    def user_info_packet_handler(self, packet: shared.UserInfoPacket):
+    def audio_levels_packet_handler(self, packet: packets.AudioLevelsPacket) -> None:
         self.player_id = packet.playerId
-
-    def audio_levels_packet_handler(self, packet: shared.AudioLevelsPacket):
         for player_id, gain in zip(packet.playerIds, packet.gains):
             self.audio_levels_map[player_id] = gain
 
-    def offsets_request_packet_handler(self, _: shared.OffsetsRequestPacket):
-        self.send(shared.OffsetsResponsePacket(self.offsets))
+    def offsets_request_packet_handler(self, _: packets.OffsetsRequestPacket) -> None:
+        self.send_data(packets.OffsetsResponsePacket(self.offsets))
 
-    def volume_packet_handler(self, packet: shared.VolumePacket):
+    def volume_packet_handler(self, packet: packets.VolumePacket) -> None:
         self.volume = packet.volume

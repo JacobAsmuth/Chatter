@@ -5,6 +5,7 @@ import enum
 import re
 import struct
 import numpy as np
+import yaml
 
 pymem.logger.setLevel(pymem.logging.CRITICAL)
 

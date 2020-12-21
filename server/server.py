@@ -1,28 +1,27 @@
 #external libs
+import pickle
 import socket
 import threading
-import time
+from time import time, sleep
 import importlib
-import pydub
 import yaml
 # internal libs
 from server.client_object import ClientObject
 from server.audio_mixers.base import AudioMixerBase
 import server.audio_mixers.array_mixer as array_mixer
-import server.audio_mixers.pydub_mixer as pydub_mixer
-import shared
+import shared.consts as consts
+import shared.packets as packets
 from sys import exit
-
 
 class Server:
     def __init__(self, audio_mixer: AudioMixerBase):
-        self.ip = socket.gethostbyname(socket.gethostname())
         self.audio_mixer = audio_mixer
         self.audio_mixer_lock = threading.Lock()
         self.voice_port = None
         self.data_port = None
         self.voice_socket = None
         self.data_socket = None
+        self.join_id = 0
         self.clients = {}
         self.clients_lock = threading.Lock()
         self.command_map = {
@@ -36,33 +35,28 @@ class Server:
         with open("server/offsets/offsets.yaml", 'r') as f:
             self.offsets = yaml.load(f, Loader=yaml.FullLoader)
 
-    def bind_voice(self, port):
-        self.voice_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    def setup_voice(self, port):
+        self.voice_socket = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
         self.voice_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.voice_socket.bind((self.ip, port))
-        self.voice_socket.listen(shared.MAX_CONCURRENT_CONNECTIONS)
+        self.voice_socket.bind(("::1", port, 0, 0))
         self.voice_port = port
 
-    def bind_data(self, port):
-        self.data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    def setup_data(self, port):
+        self.data_socket = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
         self.data_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.data_socket.bind((self.ip, port))
-        self.data_socket.listen(shared.MAX_CONCURRENT_CONNECTIONS)
+        self.data_socket.bind(("::1", port, 0, 0))
         self.data_port = port
 
     def listen(self):
         if self.voice_socket is None or self.data_socket is None:
-            raise Exception("You must sucesfully call .bind_voice(port_number) and .bind_data(port_number) before .listen()")
+            raise Exception("You must sucesfully call .setup_voice(port_number) and .setup_data(port_number) before .listen()") 
 
-        print('Running on IP: ' + self.ip)
         print('Voice port: ' + str(self.voice_port))
         print('Data port: ' + str(self.data_port))
 
-        threading.Thread(target=self.receive_voice_connections, daemon=True).start()
-        threading.Thread(target=self.receive_data_connections, daemon=True).start()
-        threading.Thread(target=self.collect_voice, daemon=True).start()
-
-        self.wait_for_commands()
+        threading.Thread(target=self.receive_voice_loop, daemon=True).start()
+        threading.Thread(target=self.receive_data_loop, daemon=True).start()
+        threading.Thread(target=self.send_voice_loop, daemon=True).start()
 
     def wait_for_commands(self):
         print("Accepting new connections. Type help for available commands.")
@@ -78,106 +72,84 @@ class Server:
             except Exception as e:
                 print(str(e))
 
-    def receive_voice_connections(self):
-        while not self.closing:
-            try:
-                socket, _ = self.voice_socket.accept()
-                with self.clients_lock:
-                    user_id = self.user_id_from_socket(socket)
-                    if not user_id:
-                        continue
+    def get_client_object(self, client_id: int, voice_address=None, data_address=None) -> ClientObject:
+        if client_id not in self.clients:
+            print("Received new client: %d" % (client_id,))
+            with self.clients_lock:
+                client = ClientObject(client_id,
+                                        self.offsets,
+                                        self.data_socket,
+                                        self.voice_socket,
+                                        self.join_id,
+                                        voice_address=voice_address,
+                                        data_address=data_address)
+                self.join_id += 1
+                self.clients[client_id] = client
+                return client
+        else:
+            client: ClientObject = self.clients[client_id]
+            if client.voice_address is None:
+                client.voice_address = voice_address
+            elif client.data_address is None:
+                client.data_address = data_address
         
-                    client = ClientObject(socket, user_id, self.offsets)
-                    self.clients[user_id] = client
-                    print("Received new voice client: %s" % (client.user_id,))
+        return self.clients[client_id]
 
-                    # The client waits for this message after voice connection.
-                    # This makes sure we don't attempt data connection before client object is in memory
-                    try:
-                        socket.send("Ready for data connection!".encode(shared.ENCODING))
-                    except:
-                        client.close()
-            except Exception as e:
-                if not self.closing:
-                    print("Error in voice connections: %s" % (e,))
-
-    def receive_data_connections(self):
+    def receive_voice_loop(self):
         while not self.closing:
             try:
-                socket, addr = self.data_socket.accept()
-                str_addr = addr[0] + ':' + str(addr[1])
+                data, address = self.voice_socket.recvfrom(consts.PACKET_SIZE)
+                packet: packets.ClientVoiceFramePacket = pickle.loads(data)
+                client = self.get_client_object(packet.clientId, voice_address=address)
+                client.add_voice_data(packet)
+            except Exception:
+                pass
 
-                print("New data connection from %s" % (str_addr,))
-
-                user_id = self.user_id_from_socket(socket)
-                if not user_id:
-                    continue
-
-                with self.clients_lock:
-                    for client in self.clients.values():
-                        if client.user_id == user_id:
-                            print("Matching voice socket found! (%s)" % (user_id,))
-                            client.set_data_socket(socket)
-                            break
-                    else:  # loop did not break
-                        print("Could not find user_id(%s) from %s, closing socket." % (user_id, str_addr,))
-                        socket.close()
+    def receive_data_loop(self):
+        while not self.closing:
+            try:
+                data, address = self.data_socket.recvfrom(consts.PACKET_SIZE)
+                packet: packets.ClientPacket = pickle.loads(data)
+                client = self.get_client_object(packet.clientId, data_address=address)
+                client.handle_packet(packet)
             except Exception as e: 
                 if not self.closing:
                     print("Error in data connections: %s" % (e,))
-
-    def user_id_from_socket(self, socket):
-        try:
-            return socket.recv(256).decode(shared.ENCODING)
-        except Exception as e:
-            print("Error receiving user id: %s" % (e,))
-            socket.close()
-        return None
             
-    def collect_voice(self):
+    def send_voice_loop(self):
         while not self.closing:
-                all_voice_data = {}
-                to_remove = []
-                with self.clients_lock:
-                    if len(self.clients) == 0: 
-                        time.sleep(0.1)  # prevent a busy-wait when there are 0 clients connected. 
+            to_remove = []
+            voice_data = {}
+            cur_time = time()
+            with self.clients_lock:
+                for client in self.clients.values():
+                    if cur_time - client.last_updated > consts.CLEANUP_TIMEOUT:
+                        to_remove.append(client)
                         continue
+                    voice_data[client] = client.read_voice_data()
 
-                    for user_id, client in self.clients.items():
-                        if client.voice_socket is None:
+                for client in to_remove:
+                    print("removed client %d" % (client.join_id,))
+                    del self.clients[client.client_id]
+                    
+            # No voice to send to anyone else
+            if len(voice_data) <= 1:
+                continue
+
+            with self.audio_mixer_lock:
+                with self.clients_lock:
+                    for client in self.clients.values():
+                        if client.voice_address is None:
+                            continue
+                        final_audio = self.audio_mixer.mix(client, voice_data)
+                        if final_audio is None:
                             continue
                         try:
-                            data = client.voice_socket.recv(shared.BYTES_PER_CHUNK)
-                            segment = pydub.AudioSegment(data, sample_width=shared.SAMPLE_WIDTH, frame_rate=shared.SAMPLE_RATE, channels=shared.CHANNELS)
-                            all_voice_data[client] = segment
-                        except socket.error:
-                            print("Removed client %s" % (user_id,))
-                            client.close()
-                            to_remove.append(user_id)
-                            continue
-
-                    for remove in to_remove:
-                        del self.clients[remove]
-                        
-                # No voice to send to anyone else
-                if len(all_voice_data) <= 1:
-                    continue
-
-                with self.audio_mixer_lock:
-                    with self.clients_lock:
-                        for client in self.clients.values():
-                            self.broadcast_voice(client, all_voice_data)
-
-    def broadcast_voice(self, destination_client: ClientObject, all_voice_data: dict):
-        final_audio = self.audio_mixer.mix(destination_client, all_voice_data)
-        if final_audio is None:
-            return
-
-        try:
-            destination_client.voice_socket.send(final_audio)
-        except Exception as e:
-            print("Error sending final audio: " + str(e))
-            destination_client.close()       
+                            for i in range(0, len(final_audio), consts.PACKET_SIZE):
+                                client.send_voice(final_audio[i:i+consts.PACKET_SIZE])
+                        except Exception as e:
+                            print("Error sending final audio: " + str(e))
+            sleep(consts.OUTPUT_BLOCK_TIME)
 
     def run_command(self, command):
         if command[0] in self.command_map:
@@ -203,13 +175,15 @@ class Server:
 
     def update_settings_command(self, _):
         for client in self.clients.values():
-            client.send(shared.ServerSettingsPacket(1, 2))
+            client.send_data(packets.ServerSettingsPacket(1, 2))
 
     def change_audio_mixer_command(self, args):
+        mixer = args[0]
         mixer_map = {
-            'pydub': (pydub_mixer, pydub_mixer.PydubMixer),
-            'array': (array_mixer, array_mixer.ArrayMixer),
+            'array': (array_mixer, 'ArrayMixer'),
         }
-        importlib.reload(mixer_map[args[0]][0])
+        mixer_module, mixer_type_name = mixer_map[mixer]
+        loaded_module = importlib.reload(mixer_module)
+        mixer_map[mixer] = (loaded_module, mixer_type_name)
         with self.audio_mixer_lock:
-            self.audio_mixer = mixer_map[args[0]][1]()
+            self.audio_mixer = getattr(loaded_module, mixer_type_name)()

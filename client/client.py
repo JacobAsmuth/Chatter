@@ -1,15 +1,18 @@
+from numpy.core.fromnumeric import shape
 import sounddevice
 import socket
 import threading
 import pickle
-from queue import Queue, Empty
 from time import sleep
 import sounddevice
 import numpy as np
-import uuid
+import random
 from sys import exit
+import audioop
+from threading import Lock
 
-import shared
+import shared.consts as consts
+import shared.packets as packets
 from client.memory import AmongUsMemory
 from client.audio_engines.base import AudioEngineBase
 
@@ -18,59 +21,57 @@ class Client:
         self.among_us_memory = among_us_memory
         self.audio_engine = audio_engine
         self.exiting = False
+        self.sent_audio = False
+        self.sent_data = False
         self.ip = None
         self.voice_port = None
         self.data_port = None
-        self.user_id = uuid.uuid4()
-        self.server_player_id = None
-        self.settings = shared.ServerSettingsPacket(0, 0)
+        self.client_id = random.getrandbits(64)
+        self.settings = packets.ServerSettingsPacket(0, 0)
+        self.encoding_state = None
+        self.decoding_state = None
+        self.send_data_lock = Lock()
+        self.frame_id = 0
 
         self.server_voice_socket = None
         self.server_data_socket = None
 
-        self.send_queue = Queue()
-
         self.command_map = {
             'help': self.help_command,
             'exit': self.exit_command,
-            'ping': self.ping_command,
             'retry': self.retry_command,
             'volume': self.volume_command,
         }
 
         self.packet_handlers = {
-            shared.PingPacket: self.ping_packet_handler,
-            shared.ServerSettingsPacket: self.server_settings_packet_handler,
-            shared.OffsetsResponsePacket: self.offsets_response_packet_handler,
+            packets.ServerSettingsPacket: self.server_settings_packet_handler,
+            packets.OffsetsResponsePacket: self.offsets_response_packet_handler,
         }
 
     def connect(self, ip, voice_port, data_port):
+        self.frame_id = 0
         self.exiting = False
-        self.server_player_id = None
         self.ip = ip
         self.voice_port = voice_port
         self.data_port = data_port
+        self.sent_audio = False
+        self.sent_data = False
 
-        self.recording_stream = sounddevice.RawInputStream(channels=shared.CHANNELS, blocksize=shared.BYTES_PER_CHUNK, samplerate=shared.SAMPLE_RATE, dtype=np.int16)
-        self.playing_stream = sounddevice.RawOutputStream(channels=shared.CHANNELS, blocksize=shared.BYTES_PER_CHUNK, samplerate=shared.SAMPLE_RATE, dtype=np.int16)
-        
-        self.server_voice_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_voice_socket.connect((ip, voice_port))
-        self.server_voice_socket.send(str(self.user_id).encode(shared.ENCODING))
+        self.recording_stream = sounddevice.RawInputStream(channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16)
+        self.playing_stream = sounddevice.RawOutputStream(channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16)
 
-        # The server will respond with a ping msg when it's ready for data
-        _ = self.server_voice_socket.recv(1024)
+        self.voice_addr = (self.ip, self.voice_port, 0, 0)
+        self.data_addr = (self.ip, self.data_port, 0, 0)
+        self.server_voice_socket = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+        self.server_data_socket = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
 
-        self.server_data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_data_socket.connect((ip, data_port))
-        self.server_data_socket.send(str(self.user_id).encode(shared.ENCODING))
+        print("Connected to data server, initializing...")
+        threading.Thread(target=self.send_audio_loop, daemon=True).start()
+        threading.Thread(target=self.receive_audio_loop, daemon=True).start()
 
-        threading.Thread(target=self.receive_server_audio, daemon=True).start()
-        threading.Thread(target=self.send_client_audio, daemon=True).start()
+        threading.Thread(target=self.read_memory_loop, daemon=True).start()
+        threading.Thread(target=self.receive_data_loop, daemon=True).start()
 
-        threading.Thread(target=self.receive_server_data, daemon=True).start()
-        threading.Thread(target=self.send_client_data, daemon=True).start()
-        threading.Thread(target=self.read_memory, daemon=True).start()
 
     def close(self):
         self.exiting = True
@@ -110,14 +111,17 @@ class Client:
             except Exception as e:
                 print(str(e))
 
-    def receive_server_data(self):
+    def receive_data_loop(self):
+        while not self.sent_data:
+            sleep(0.1)
+
         while not self.exiting:
             try:
-                data = self.server_data_socket.recv(1024)
-                if len(data) == 0:
+                packet_bytes, _ = self.server_data_socket.recvfrom(consts.PACKET_SIZE)
+                if len(packet_bytes) == 0:
                     self.close()
 
-                packet = pickle.loads(data)
+                packet = pickle.loads(packet_bytes)
                 packet_type = type(packet)
 
                 if packet_type in self.packet_handlers:
@@ -137,30 +141,48 @@ class Client:
                     print("Error parsing packet: %s" % (e,))
                 break
 
-    def send_client_data(self):
-        object_to_send = None
+    def send(self, packet):
+        try:
+            val = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
+            with self.send_data_lock:  # rarely contested, only when user initiates something
+                self.server_data_socket.sendto(val, self.data_addr)
+            self.sent_data = True
+        except WindowsError:
+            if not self.exiting:
+                self.close()
+                print("Remote server died :(")
+        except Exception as e:
+            print("Unable to send %s: %s" % (packet, e))
+                
+    def send_audio_loop(self):
+        self.recording_stream.start()
+
         while not self.exiting:
             try:
-                object_to_send = self.send_queue.get_nowait()
-                val = pickle.dumps(object_to_send, protocol=shared.PICKLE_PROTOCOL)
-                self.server_data_socket.sendall(val)
-            except Empty:
-                sleep(0.1)
-            except WindowsError:
+                raw_audio = self.recording_stream.read(consts.SAMPLES_PER_CHUNK)[0]
+                encoded_audio, self.encoding_state = audioop.lin2adpcm(raw_audio, consts.BYTES_PER_SAMPLE, self.encoding_state)
+                packet = packets.ClientVoiceFramePacket(frameId=self.frame_id, clientId=self.client_id, voiceData=encoded_audio)
+                packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
+
+                self.server_voice_socket.sendto(packet_bytes, self.voice_addr)
+                self.frame_id += 1
+                self.sent_audio = True
+            except Exception as e:
                 if not self.exiting:
                     self.close()
-                    print("Remote server died :(")
-            except Exception as e:
-                print("Unable to send %s: %s" % (object_to_send, e))
-                
-    def send(self, packet):
-        self.send_queue.put_nowait(packet)
+                    print("Error sending audio: " + str(e))
 
-    def receive_server_audio(self):
+    def receive_audio_loop(self):
         self.playing_stream.start()
+
+        while not self.sent_audio:
+            sleep(0.1)
+
         while not self.exiting:
             try:
-                voice_data = self.server_voice_socket.recv(shared.BYTES_PER_CHUNK)
+                raw_bytes, _ = self.server_voice_socket.recvfrom(consts.PACKET_SIZE)
+                packet: packets.ServerVoiceFramePacket = pickle.loads(raw_bytes)
+                voice_data, self.decoding_state = audioop.adpcm2lin(packet.voiceData, consts.BYTES_PER_SAMPLE, self.decoding_state)
                 self.playing_stream.write(voice_data)
             except WindowsError as e:
                 if not self.exiting:
@@ -173,18 +195,6 @@ class Client:
                     print("Error receiving audio: " + str(e))
                 break
 
-    def send_client_audio(self):
-        self.recording_stream.start()
-        while not self.exiting:
-            try:
-                data = self.recording_stream.read(shared.SAMPLES_PER_CHUNK)[0]
-                self.server_voice_socket.sendall(data)
-            except Exception as e:
-                if not self.exiting:
-                    self.close()
-                    print("Error sending audio: " + str(e))
-                break
-
     def _poll_among_us(self):
         if not self.among_us_memory.open_process():
             print("Waiting for Among Us.exe...")
@@ -193,34 +203,34 @@ class Client:
 
         print("Found Among Us.exe!")       
 
-    def read_memory(self):
-        self.send(shared.OffsetsRequestPacket())
-        self._poll_among_us()
+    def _get_offsets(self):
+        print("Asking for offsets from server...")
+        self.send(packets.OffsetsRequestPacket(clientId=self.client_id))
+        sleep(3)
         while not self.among_us_memory.has_offsets():
-            print("Waiting for offsets from server...")
-            sleep(1)
+            sleep(3)
+            self.send(packets.OffsetsRequestPacket(clientId=self.client_id))  # gotta resend, packet might've been dropped
+        print("Offsets recived!")
+
+    def read_memory_loop(self):
+        self._get_offsets()
+        self._poll_among_us()
 
         while not self.exiting:
             try:
                 memory_read = self.among_us_memory.read()
                 if memory_read.local_player:
-                    player_id = memory_read.local_player.playerId
-                    if self.server_player_id != player_id:
-                        self.send(shared.UserInfoPacket(playerId=player_id))  # update the server with our new player ID
-                        self.server_player_id = player_id
-                    self.send(self.audio_engine.get_audio_levels(memory_read))
-                elif self.server_player_id:  # no local player but the server thinks there is one
-                    self.send(shared.UserInfoPacket(player_id=None))
-                    self.server_player_id = None
-
-
+                    ids, gains = self.audio_engine.get_audio_levels(memory_read)
+                    self.send(packets.AudioLevelsPacket(clientId=self.client_id,
+                                                        playerId=memory_read.local_player.playerId,
+                                                        playerIds=ids,
+                                                        gains=gains))
                 sleep(0.05)
             except Exception as e:
                 print(e)
                 sleep(5)
                 self._poll_among_us()
             
-
     def run_command(self, command):
         if command[0] in self.command_map:
              # pass all the words except the first one, that's the command word itself
@@ -234,6 +244,8 @@ class Client:
 
     def retry_command(self, _):
         self.close()
+        print("Reconnecting")
+        sleep(consts.CLEANUP_TIMEOUT + 3)
         self.connect(self.ip, self.voice_port, self.data_port)
 
     def help_command(self, _):
@@ -241,21 +253,15 @@ class Client:
         for command in self.command_map.keys():
             print(command)
     
-    def ping_command(self, _):
-        self.send(shared.PingPacket())
-
     def volume_command(self, args):
         volume = float(args[1])
-        self.send(shared.VolumePacket(volume))
+        self.send(packets.VolumePacket(self.client_id, volume))
 
-    def ping_packet_handler(self, packet: shared.PingPacket):
-        print("Ping Received!")
-
-    def server_settings_packet_handler(self, packet: shared.ServerSettingsPacket):
+    def server_settings_packet_handler(self, packet: packets.ServerSettingsPacket):
         for field in packet.__dataclass_fields__:
              val = getattr(packet, field)
              if val is not None:
                  setattr(self.settings, field, val)
 
-    def offsets_response_packet_handler(self, packet: shared.OffsetsResponsePacket):
+    def offsets_response_packet_handler(self, packet: packets.OffsetsResponsePacket):
         self.among_us_memory.set_offsets(packet.offsets)

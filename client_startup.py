@@ -1,9 +1,8 @@
 import sys
 from client.client import Client
 import client.memory as memory
-import shared
+import shared.consts as consts
 from client.audio_engines.linear import Linear
-
 
 def main(args):
     mem = memory.AmongUsMemory()
@@ -12,9 +11,9 @@ def main(args):
     client = Client(mem, linear_audio)
     if len(args) == 0:
         ip = input("Please enter the IP address to connect to: ")
-        client.connect(ip, shared.VOICE_PORT, shared.DATA_PORT)
+        client.connect(ip, consts.VOICE_PORT, consts.DATA_PORT)
     else:
-        client.connect(args[0], shared.VOICE_PORT, shared.DATA_PORT)
+        client.connect(args[0], consts.VOICE_PORT, consts.DATA_PORT)
     client.wait_for_commands()
 
 
