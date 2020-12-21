@@ -1,8 +1,10 @@
 import shared.consts as consts
 import shared.packets as packets
+from shared.jitter_buffer import JitterBuffer
+
+from typing import Union
 from time import time
 import collections
-import io
 import socket
 import pickle
 import audioop
@@ -19,8 +21,7 @@ class ClientObject:
         self.decoding_state = None
         self.offsets = offsets
         self.player_id = None  # In-game player ID
-        #self.voice_data = io.BytesIO()
-        self.voice_data = bytes()
+        self.voice_buffer = JitterBuffer(consts.MIN_BUFFER_SIZE, consts.MAX_BUFFER_SIZE)
         self.audio_levels_map = collections.defaultdict(float)
         self.packet_handlers = {
             packets.AudioLevelsPacket: self.audio_levels_packet_handler,
@@ -44,17 +45,11 @@ class ClientObject:
 
     def add_voice_data(self, packet: packets.ClientVoiceFramePacket) -> None:
         self.last_updated = time()
-        decoded, self.decoding_state = audioop.adpcm2lin(packet.voiceData, consts.BYTES_PER_SAMPLE, self.decoding_state)
-        #self.voice_data.write(decoded)
-        self.voice_data = decoded
+        decoded_audio, self.decoding_state = audioop.adpcm2lin(packet.voiceData, consts.BYTES_PER_SAMPLE, self.decoding_state)
+        self.voice_buffer.add_frame(packet.frameId, decoded_audio)
 
-    def read_voice_data(self) -> bytes:
-        #self.voice_data.seek(0)
-        #data = self.voice_data.read()
-        #self.voice_data = io.BytesIO()
-        data = self.voice_data
-        self.voice_data = bytes()
-        return data
+    def read_voice_data(self) -> Union[bytes, None]:
+        return self.voice_buffer.get_samples()
 
     def handle_packet(self, packet: packets.ClientPacket) -> None:
         packet_type = type(packet)

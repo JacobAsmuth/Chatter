@@ -126,7 +126,9 @@ class Server:
                     if cur_time - client.last_updated > consts.CLEANUP_TIMEOUT:
                         to_remove.append(client)
                         continue
-                    voice_data[client] = client.read_voice_data()
+                    client_voice_data = client.read_voice_data()
+                    if client_voice_data is not None:
+                        voice_data[client] = client_voice_data
 
                 for client in to_remove:
                     print("removed client %d" % (client.join_id,))

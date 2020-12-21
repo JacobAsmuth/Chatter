@@ -1,4 +1,3 @@
-from numpy.core.fromnumeric import shape
 import sounddevice
 import socket
 import threading
@@ -10,6 +9,7 @@ import random
 from sys import exit
 import audioop
 from threading import Lock
+from shared.jitter_buffer import JitterBuffer
 
 import shared.consts as consts
 import shared.packets as packets
@@ -32,6 +32,7 @@ class Client:
         self.decoding_state = None
         self.send_data_lock = Lock()
         self.frame_id = 0
+        self.voice_buffer = JitterBuffer(consts.MIN_BUFFER_SIZE, consts.MAX_BUFFER_SIZE)
 
         self.server_voice_socket = None
         self.server_data_socket = None
@@ -65,13 +66,13 @@ class Client:
         self.server_voice_socket = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
         self.server_data_socket = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
 
-        print("Connected to data server, initializing...")
+        print("Initializing microphone recording...")
         threading.Thread(target=self.send_audio_loop, daemon=True).start()
         threading.Thread(target=self.receive_audio_loop, daemon=True).start()
 
         threading.Thread(target=self.read_memory_loop, daemon=True).start()
         threading.Thread(target=self.receive_data_loop, daemon=True).start()
-
+        threading.Thread(target=self.play_audio_loop, daemon=True).start()
 
     def close(self):
         self.exiting = True
@@ -173,8 +174,6 @@ class Client:
                     print("Error sending audio: " + str(e))
 
     def receive_audio_loop(self):
-        self.playing_stream.start()
-
         while not self.sent_audio:
             sleep(0.1)
 
@@ -182,8 +181,8 @@ class Client:
             try:
                 raw_bytes, _ = self.server_voice_socket.recvfrom(consts.PACKET_SIZE)
                 packet: packets.ServerVoiceFramePacket = pickle.loads(raw_bytes)
-                voice_data, self.decoding_state = audioop.adpcm2lin(packet.voiceData, consts.BYTES_PER_SAMPLE, self.decoding_state)
-                self.playing_stream.write(voice_data)
+                decoded_voice, self.decoding_state = audioop.adpcm2lin(packet.voiceData, consts.BYTES_PER_SAMPLE, self.decoding_state)
+                self.voice_buffer.add_frame(packet.frameId, decoded_voice)
             except WindowsError as e:
                 if not self.exiting:
                     self.close()
@@ -194,6 +193,15 @@ class Client:
                     self.close()
                     print("Error receiving audio: " + str(e))
                 break
+
+    def play_audio_loop(self):
+        self.playing_stream.start()
+
+        while not self.exiting:
+            samples = self.voice_buffer.get_samples()
+            if samples is not None:
+                self.playing_stream.write(samples)
+            sleep(consts.OUTPUT_BLOCK_TIME)
 
     def _poll_among_us(self):
         if not self.among_us_memory.open_process():
