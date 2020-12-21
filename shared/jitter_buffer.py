@@ -44,6 +44,7 @@ class JitterBuffer(object):
         if insert_index == self.max_frame_count:
             self.frames.popleft()
             insert_index -= 1
+            self.expected_next_frame_id += 1
 
         for i, frame in enumerate(self.frames):
             if frame_id < frame.frameId:
