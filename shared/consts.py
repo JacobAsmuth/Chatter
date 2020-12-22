@@ -18,6 +18,8 @@ PICKLE_PROTOCOL = pickle.HIGHEST_PROTOCOL
 CLEANUP_TIMEOUT = 1
 PACKET_SIZE = 2**11
 
-# number of frames to store
-MIN_BUFFER_SIZE = 2
+# number of frames to store in the jitter buffers
+MIN_BUFFER_SIZE = 5
 MAX_BUFFER_SIZE = 10
+
+GIT_UPDATE_CHECK_FREQUENCY = 10

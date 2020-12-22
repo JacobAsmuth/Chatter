@@ -120,10 +120,13 @@ class Server:
         else:
             print('Unknown command :(')
 
-    def exit_command(self, _):
+    def close(self):
         self.closing = True
         self.data_socket.close()
         self.voice_socket.close()
+
+    def exit_command(self, _):
+        self.close()
         exit()
 
     def help_command(self, _):
