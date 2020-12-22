@@ -17,6 +17,7 @@ class Linear(base.AudioEngineBase):
         gains = []
         lp_pos = lp.pos
         lp_dead = lp.dead
+        print(lp_dead)
         max_dist = settings.voice_distance
 
         if memory_read.game_state == memory.GameState.DISCUSSION:

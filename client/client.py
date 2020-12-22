@@ -75,8 +75,7 @@ class Client:
         threading.Thread(target=self.receive_audio_loop, daemon=True).start()
 
         threading.Thread(target=self.read_memory_loop, daemon=True).start()
-        threading.Thread(target=self.receive_data_loop, args=(self.udp_data_socket.recvfrom,), daemon=True).start()
-        threading.Thread(target=self.receive_data_loop, args=(self.tcp_data_socket.recv,), daemon=True).start()
+        threading.Thread(target=self.receive_tcp_data_loop, daemon=True).start()
         threading.Thread(target=self.play_audio_loop, daemon=True).start()
 
     def close(self):
@@ -117,13 +116,15 @@ class Client:
             except Exception as e:
                 print(str(e))
 
-    def receive_data_loop(self, recv_func):
+
+    def receive_tcp_data_loop(self):
         while not self.sent_data:
             sleep(0.1)
 
         while not self.exiting:
             try:
-                packet_bytes, _ = recv_func(consts.PACKET_SIZE)
+                packet_bytes = self.tcp_data_socket.recv(consts.PACKET_SIZE)
+                print("received %s bytes " % (len(packet_bytes),))
                 if len(packet_bytes) == 0:
                     self.close()
 
@@ -137,7 +138,7 @@ class Client:
 
             except WindowsError as e:
                 if not self.exiting:
-                    print("Error with %s data socket: %s, closing connections." % (repr(recv_func), e,))
+                    print("Error with data socket: %s, closing connections." % (e,))
                     self.close()
                 break
             except Exception as e:

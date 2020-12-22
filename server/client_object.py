@@ -47,6 +47,7 @@ class ClientObject:
         while not self.closing:
             try:
                 raw_bytes = self.tcp_data_socket.recv(consts.PACKET_SIZE)
+                print("received %d bytes" % (len(raw_bytes,)))
                 packet = pickle.loads(raw_bytes)
                 self.handle_packet(packet)
             except Exception as e: 
