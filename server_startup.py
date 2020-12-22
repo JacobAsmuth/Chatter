@@ -5,8 +5,6 @@ from server.audio_mixers.array_mixer import ArrayMixer
 import yappi
 
 def main():
-    yappi.set_clock_type("cpu")
-    yappi.start()
     server = Server(ArrayMixer())
     try:
         server.setup_voice(consts.VOICE_PORT)
@@ -19,8 +17,6 @@ def main():
         print("Couldn't bind to port: " + str(e))
     except SystemExit:
         pass
-        yappi.get_func_stats().print_all()
-        yappi.get_thread_stats().print_all()
 
         
 if __name__ == "__main__":
