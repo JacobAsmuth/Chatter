@@ -9,6 +9,7 @@ import multiprocessing
 import threading
 import time
 import sys
+import git
 #
 def install_new_packages():
     pip.main(["install", '-r', 'requirements.txt'])
@@ -18,7 +19,6 @@ def restart_program():
     os.execl(sys.executable, '"%s"' % (sys.executable,), *sys.argv)
 
 def do_git_pull(cwd: str, did_pull: multiprocessing.Value):
-    import git
     repo = git.Repo(cwd)
     old_head = repo.head.commit.hexsha
     new_head = repo.remote('origin').pull('master')[0].commit.hexsha
