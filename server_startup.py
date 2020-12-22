@@ -9,15 +9,17 @@ import multiprocessing
 import threading
 import time
 import sys
-import git
 
 def install_new_packages():
-    pip.main(["install", '-r', 'requirements.txt'])
+    pip.main(["install", '-r', 'requirements.txt', '-q'])
 
 def restart_program():
     os.execv(sys.executable, ['python'] + sys.argv)
 
+# According to the documentation the 'git' library shouldn't be used in long-running programs due to memory leaks
+# So we run it in a seperate process I guess.
 def do_git_pull(cwd: str, did_pull: multiprocessing.Value):
+    import git
     repo = git.Repo(cwd)
     old_head = repo.head.commit.hexsha
     new_head = repo.remote('origin').pull('master')[0].commit.hexsha
