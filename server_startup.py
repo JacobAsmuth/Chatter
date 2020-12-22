@@ -2,7 +2,6 @@ from server.server import Server
 import shared.consts as consts
 from server.audio_mixers.array_mixer import ArrayMixer
 
-import yappi
 import pip
 import os
 import inspect
@@ -40,8 +39,6 @@ def update_if_possible(server: Server) -> bool:
         time.sleep(consts.GIT_UPDATE_CHECK_FREQUENCY)
 
 def main():
-    #yappi.set_clock_type("cpu")
-    #yappi.start()
     filename = inspect.getframeinfo(inspect.currentframe()).filename
     cwd = os.path.dirname(os.path.realpath(filename))
 
@@ -60,8 +57,6 @@ def main():
         print("Couldn't bind to port: " + str(e))
     except SystemExit:
         pass
-        #yappi.get_func_stats().print_all()
-        #yappi.get_thread_stats().print_all()
 
         
 if __name__ == "__main__":
