@@ -1,3 +1,4 @@
+from struct import pack
 import sounddevice
 import socket
 import threading
@@ -33,8 +34,8 @@ class Client:
         self.send_data_lock = Lock()
         self.voice_buffer = JitterBuffer(consts.MIN_BUFFER_SIZE, consts.MAX_BUFFER_SIZE)
 
-        self.server_voice_socket = None
-        self.server_data_socket = None
+        self.voice_socket = None
+        self.udp_data_socket = None
 
         self.command_map = {
             'help': self.help_command,
@@ -61,26 +62,32 @@ class Client:
 
         self.voice_addr = (self.ip, self.voice_port)
         self.data_addr = (self.ip, self.data_port)
-        self.server_voice_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.server_data_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.voice_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.udp_data_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.tcp_data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.tcp_data_socket.connect(self.data_addr)
+        self.tcp_data_socket.sendall(pickle.dumps(packets.ClientPacket(self.client_id), consts.PICKLE_PROTOCOL))
 
-        print("Initializing...") 
+        _ = self.tcp_data_socket.recv(len(consts.ACK_MSG))
+
+        print("Connected to server, initializing...") 
         threading.Thread(target=self.send_audio_loop, daemon=True).start()
         threading.Thread(target=self.receive_audio_loop, daemon=True).start()
 
         threading.Thread(target=self.read_memory_loop, daemon=True).start()
-        threading.Thread(target=self.receive_data_loop, daemon=True).start()
+        threading.Thread(target=self.receive_data_loop, args=(self.udp_data_socket.recvfrom,), daemon=True).start()
+        threading.Thread(target=self.receive_data_loop, args=(self.tcp_data_socket.recv,), daemon=True).start()
         threading.Thread(target=self.play_audio_loop, daemon=True).start()
 
     def close(self):
         self.exiting = True
 
         try:
-            self.server_voice_socket.close()
+            self.voice_socket.close()
         except: pass
 
         try:
-            self.server_data_socket.close()
+            self.udp_data_socket.close()
         except: pass
 
         try:
@@ -110,13 +117,13 @@ class Client:
             except Exception as e:
                 print(str(e))
 
-    def receive_data_loop(self):
+    def receive_data_loop(self, recv_func):
         while not self.sent_data:
             sleep(0.1)
 
         while not self.exiting:
             try:
-                packet_bytes, _ = self.server_data_socket.recvfrom(consts.PACKET_SIZE)
+                packet_bytes, _ = recv_func(consts.PACKET_SIZE)
                 if len(packet_bytes) == 0:
                     self.close()
 
@@ -130,7 +137,7 @@ class Client:
 
             except WindowsError as e:
                 if not self.exiting:
-                    print("Error with data socket: %s, closing connections." % (e,))
+                    print("Error with %s data socket: %s, closing connections." % (repr(recv_func), e,))
                     self.close()
                 break
             except Exception as e:
@@ -139,12 +146,14 @@ class Client:
                     print("Error parsing packet: %s" % (e,))
                 break
 
-    def send(self, packet):
+    def send(self, packet, tcp=True):
         try:
-            val = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
-            with self.send_data_lock:  # rarely contested, only when user initiates something
-                self.server_data_socket.sendto(val, self.data_addr)
-            self.sent_data = True
+            packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
+            if tcp:
+                self.tcp_data_socket.sendall(packet_bytes)
+            else:
+                self.udp_data_socket.sendto(packet_bytes, self.data_addr)
+                self.sent_data = True
         except WindowsError as e:
             if not self.exiting:
                 self.close()
@@ -166,7 +175,7 @@ class Client:
                 packet = packets.ClientVoiceFramePacket(frameId=time(), clientId=self.client_id, voiceFrame=encoded_audio)
                 packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
 
-                self.server_voice_socket.sendto(packet_bytes, self.voice_addr)
+                self.voice_socket.sendto(packet_bytes, self.voice_addr)
                 self.sent_audio = True
             except Exception as e:
                 if not self.exiting:
@@ -179,7 +188,7 @@ class Client:
 
         while not self.exiting:
             try:
-                raw_bytes, _ = self.server_voice_socket.recvfrom(consts.PACKET_SIZE)
+                raw_bytes, _ = self.voice_socket.recvfrom(consts.PACKET_SIZE)
                 packet: packets.ServerVoiceFramePacket = pickle.loads(raw_bytes)
                 decoded_voice, self.decoding_state = audioop.adpcm2lin(packet.voiceFrame, consts.BYTES_PER_SAMPLE, self.decoding_state)
                 self.voice_buffer.add_frame(packet.frameId, decoded_voice)
@@ -200,6 +209,7 @@ class Client:
             samples = self.voice_buffer.get_samples()
             if samples is not None:
                 self.playing_stream.write(samples)
+            sleep(0.01)
 
     def _poll_among_us(self):
         if not self.among_us_memory.open_process():
@@ -211,11 +221,11 @@ class Client:
 
     def _get_offsets(self):
         print("Asking for offsets from server...")
-        self.send(packets.OffsetsRequestPacket(clientId=self.client_id))
-        sleep(3)
+        self.send(packets.OffsetsRequestPacket())
+        sleep(2)
         while not self.among_us_memory.has_offsets():
-            sleep(3)
-            self.send(packets.OffsetsRequestPacket(clientId=self.client_id))  # gotta resend, packet might've been dropped
+            sleep(2)
+            self.send(packets.OffsetsRequestPacket())  # gotta resend, packet might've been dropped
         print("Offsets recived!")
 
     def read_memory_loop(self):
@@ -230,7 +240,7 @@ class Client:
                     self.send(packets.AudioLevelsPacket(clientId=self.client_id,
                                                         playerId=memory_read.local_player.playerId,
                                                         playerIds=ids,
-                                                        gains=gains))
+                                                        gains=gains), tcp=False)
                 sleep(0.05)
             except Exception as e:
                 print(e)
@@ -260,8 +270,7 @@ class Client:
             print(command)
     
     def volume_command(self, args):
-        volume = float(args[1])
-        self.send(packets.VolumePacket(self.client_id, volume))
+        self.send(packets.VolumePacket(float(args[1])))
 
     def server_settings_packet_handler(self, packet: packets.ServerSettingsPacket):
         for field in packet.__dataclass_fields__:

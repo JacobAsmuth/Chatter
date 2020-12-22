@@ -20,7 +20,7 @@ class Server:
         self.voice_port = None
         self.data_port = None
         self.voice_socket = None
-        self.data_socket = None
+        self.udp_data_socket = None
         self.join_id = 0
         self.clients = {}
         self.clients_lock = threading.Lock()
@@ -42,20 +42,28 @@ class Server:
         self.voice_port = port
 
     def setup_data(self, port):
-        self.data_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.data_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.data_socket.bind(("0.0.0.0", port))
+        self.udp_data_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.udp_data_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.udp_data_socket.bind(("0.0.0.0", port))
+        
+        self.tcp_data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.tcp_data_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.tcp_data_socket.bind(("0.0.0.0", port))
+
         self.data_port = port
 
     def listen(self):
-        if self.voice_socket is None or self.data_socket is None:
+        if self.voice_socket is None or self.udp_data_socket is None:
             raise Exception("You must sucesfully call .setup_voice(port_number) and .setup_data(port_number) before .listen()") 
 
         print('Voice port: ' + str(self.voice_port))
         print('Data port: ' + str(self.data_port))
 
+        self.tcp_data_socket.listen(consts.MAX_CONCURRENT_CONNECTIONS)
+        threading.Thread(target=self.receive_tcp_connections_loop, daemon=True).start()
+
         threading.Thread(target=self.receive_voice_loop, daemon=True).start()
-        threading.Thread(target=self.receive_data_loop, daemon=True).start()
+        threading.Thread(target=self.receive_udp_data_loop, daemon=True).start()
         threading.Thread(target=self.send_voice_loop, daemon=True).start()
 
     def send_voice_loop(self):
@@ -68,12 +76,13 @@ class Server:
                     if cur_time - client.last_updated > consts.CLEANUP_TIMEOUT:
                         to_remove.append(client)
                         continue
-                    client_voice_frame = client.client_voice_frame()
+                    client_voice_frame = client.read_voice_frame()
                     if client_voice_frame is not None:
                         voice_frames[client] = client_voice_frame
 
                 for client in to_remove:
                     print("removed client %d" % (client.join_id,))
+                    client.close()
                     del self.clients[client.client_id]
                     
             # voice to send to anyone else
@@ -102,10 +111,43 @@ class Server:
             except Exception:
                 pass
 
-    def receive_data_loop(self):
+    def handle_new_client_sockets(self, tcp_data_socket: socket.socket):
+        try:
+            tcp_data_socket.settimeout(5)
+            raw_bytes = tcp_data_socket.recv(consts.PACKET_SIZE)
+            tcp_data_socket.settimeout(None)
+            client_packet: packets.ClientPacket = pickle.loads(raw_bytes)
+            if type(client_packet) != packets.ClientPacket:
+                raise Exception("Invalid packet type: %s" % (type(client_packet)))
+
+
+            with self.clients_lock:
+                tcp_data_socket.sendall(consts.ACK_MSG)
+
+                client = ClientObject(client_packet.clientId,
+                                        self.offsets,
+                                        tcp_data_socket,
+                                        self.udp_data_socket,
+                                        self.voice_socket,
+                                        self.get_next_join_id())
+                print("Received new client: %d" % (client.join_id,))
+                self.clients[client_packet.clientId] = client
+        except Exception as e:
+            print("Failed to accept new client: %s" % (e,))
+
+    def receive_tcp_connections_loop(self):
         while not self.closing:
             try:
-                raw_bytes, address = self.data_socket.recvfrom(consts.PACKET_SIZE)
+                client_socket, _ = self.tcp_data_socket.accept()
+                threading.Thread(target=self.handle_new_client_sockets, args=(client_socket,)).start()
+            except Exception as e:
+                if not self.closing:
+                    print("Error receving new client: %s" % (e,))
+    
+    def receive_udp_data_loop(self):
+        while not self.closing:
+            try:
+                raw_bytes, address = self.udp_data_socket.recvfrom(consts.PACKET_SIZE)
                 packet: packets.ClientPacket = pickle.loads(raw_bytes)
                 client = self.get_client_object(packet.clientId, data_address=address)
                 client.handle_packet(packet)
@@ -122,7 +164,8 @@ class Server:
 
     def close(self):
         self.closing = True
-        self.data_socket.close()
+        self.tcp_data_socket.close()
+        self.udp_data_socket.close()
         self.voice_socket.close()
 
     def exit_command(self, _):
@@ -165,24 +208,16 @@ class Server:
                 print(str(e))
 
     def get_client_object(self, client_id: int, voice_address=None, data_address=None) -> ClientObject:
-        if client_id not in self.clients:
-            print("Received new client: %d" % (client_id,))
-            with self.clients_lock:
-                client = ClientObject(client_id,
-                                        self.offsets,
-                                        self.data_socket,
-                                        self.voice_socket,
-                                        self.join_id,
-                                        voice_address=voice_address,
-                                        data_address=data_address)
-                self.join_id += 1
-                self.clients[client_id] = client
-                return client
-        else:
+        try:
             client: ClientObject = self.clients[client_id]
             if client.voice_address is None:
                 client.voice_address = voice_address
             elif client.data_address is None:
                 client.data_address = data_address
-        
-        return self.clients[client_id]
+        except KeyError:
+            raise Exception("Unknown client: %d" % (client_id,))
+        return client
+
+    def get_next_join_id(self):
+        self.join_id += 1
+        return self.join_id - 1

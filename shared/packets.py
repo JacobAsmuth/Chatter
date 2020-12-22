@@ -22,11 +22,11 @@ class AudioLevelsPacket(ClientPacket):
     gains: List[float]
 
 @dataclass
-class VolumePacket(ClientPacket):
+class VolumePacket:
     volume: float
 
 @dataclass
-class OffsetsRequestPacket(ClientPacket):
+class OffsetsRequestPacket:
     pass
 
 @dataclass
