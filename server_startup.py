@@ -14,6 +14,7 @@ def install_new_packages():
     pip.main(["install", '-r', 'requirements.txt'])
 
 def restart_program():
+    print('execuable: %s' % (sys.executable,))
     os.execl(sys.executable, '"%s"' % (sys.executable,), *sys.argv)
 
 def do_git_pull(cwd: str, did_pull: multiprocessing.Value):
@@ -39,10 +40,6 @@ def update_if_possible(server: Server) -> bool:
         time.sleep(consts.GIT_UPDATE_CHECK_FREQUENCY)
 
 def main():
-    filename = inspect.getframeinfo(inspect.currentframe()).filename
-    cwd = os.path.dirname(os.path.realpath(filename))
-
-
     server = Server(ArrayMixer())
     try:
         server.setup_voice(consts.VOICE_PORT)
