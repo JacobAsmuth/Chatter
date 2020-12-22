@@ -35,5 +35,6 @@ class OffsetsResponsePacket:
 
 @dataclass
 class ServerSettingsPacket:
-    voice_distance: int
-    wall_attenuation: int
+    voice_distance: float
+    wall_attenuation: float
+    lowest_hearable_volume: float

@@ -61,28 +61,28 @@ class Server:
     def send_voice_loop(self):
         while not self.closing:
             to_remove = []
-            voice_data = {}
+            voice_frames = {}
             cur_time = time()
             with self.clients_lock:
                 for client in self.clients.values():
                     if cur_time - client.last_updated > consts.CLEANUP_TIMEOUT:
                         to_remove.append(client)
                         continue
-                    client_voice_data = client.read_voice_data()
-                    if client_voice_data is not None:
-                        voice_data[client] = client_voice_data
+                    client_voice_frame = client.client_voice_frame()
+                    if client_voice_frame is not None:
+                        voice_frames[client] = client_voice_frame
 
                 for client in to_remove:
                     print("removed client %d" % (client.join_id,))
                     del self.clients[client.client_id]
                     
             # voice to send to anyone else
-            if len(voice_data) > 1:
+            if len(voice_frames) > 1:
                 with self.audio_mixer_lock and self.clients_lock:
                     for client in self.clients.values():
                         if client.voice_address is None:
                             continue
-                        final_audio = self.audio_mixer.mix(client, voice_data)
+                        final_audio = self.audio_mixer.mix(client, voice_frames)
                         if final_audio is None:
                             continue
                         try:
@@ -98,7 +98,7 @@ class Server:
                 data, address = self.voice_socket.recvfrom(consts.PACKET_SIZE)
                 packet: packets.ClientVoiceFramePacket = pickle.loads(data)
                 client = self.get_client_object(packet.clientId, voice_address=address)
-                client.add_voice_data(packet)
+                client.add_voice_frame(packet)
             except Exception:
                 pass
 

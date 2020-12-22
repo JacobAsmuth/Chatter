@@ -56,8 +56,8 @@ class Client:
         self.sent_audio = False
         self.sent_data = False
 
-        self.recording_stream = sounddevice.RawInputStream(channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16)
-        self.playing_stream = sounddevice.RawOutputStream(channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16)
+        self.recording_stream = sounddevice.RawInputStream(latency='low', channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16)
+        self.playing_stream = sounddevice.RawOutputStream(latency='low', channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16)
 
         self.voice_addr = (self.ip, self.voice_port)
         self.data_addr = (self.ip, self.data_port)
@@ -158,7 +158,11 @@ class Client:
 
         while not self.exiting:
             try:
-                raw_audio, _ = self.recording_stream.read(consts.SAMPLES_PER_CHUNK)
+                raw_audio, _ = self.recording_stream.read(consts.SAMPLES_PER_FRAME)
+                delta = len(raw_audio) - consts.BYTES_PER_SAMPLE
+                if delta < 0:  # The framework 'guarantees' this will never happen, but with some people it happens all the time.
+                    raw_audio += bytes(0 for _ in range(delta))
+
                 encoded_audio, self.encoding_state = audioop.lin2adpcm(raw_audio, consts.BYTES_PER_SAMPLE, self.encoding_state)
                 packet = packets.ClientVoiceFramePacket(frameId=time(), clientId=self.client_id, voiceData=encoded_audio)
                 packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
