@@ -60,7 +60,6 @@ class Server:
 
     def send_voice_loop(self):
         while not self.closing:
-            print("In voice loop")
             to_remove = []
             voice_data = {}
             cur_time = time()
