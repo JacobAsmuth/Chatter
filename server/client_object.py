@@ -61,11 +61,7 @@ class ClientObject:
         packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
         self.voice_socket.sendto(packet_bytes, self.voice_address)
 
-    def send_udp_data(self, packet) -> None:
-        packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
-        self.udp_data_socket.sendto(packet_bytes, self.data_address)
-
-    def send_tcp_data(self, packet) -> None:
+    def send(self, packet) -> None:
         packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
         self.tcp_data_socket.send(packet_bytes)
 
@@ -77,7 +73,7 @@ class ClientObject:
     def read_voice_frame(self) -> Union[bytes, None]:
         return self.voice_buffer.get_samples()
 
-    def handle_packet(self, packet: packets.ClientPacket) -> None:
+    def handle_packet(self, packet) -> None:
         packet_type = type(packet)
         if packet_type not in self.packet_handlers:
             raise ValueError("Unknown packet type: %s" % (type(packet),))
@@ -90,7 +86,7 @@ class ClientObject:
             self.audio_levels_map[player_id] = gain
 
     def offsets_request_packet_handler(self, _: packets.OffsetsRequestPacket) -> None:
-        self.send_tcp_data(packets.OffsetsResponsePacket(self.offsets))
+        self.send(packets.OffsetsResponsePacket(self.offsets))
 
     def volume_packet_handler(self, packet: packets.VolumePacket) -> None:
         self.volume = packet.volume

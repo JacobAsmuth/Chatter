@@ -23,7 +23,6 @@ class Client:
         self.audio_engine = audio_engine
         self.exiting = False
         self.sent_audio = False
-        self.sent_data = False
         self.ip = None
         self.voice_port = None
         self.data_port = None
@@ -55,7 +54,6 @@ class Client:
         self.voice_port = voice_port
         self.data_port = data_port
         self.sent_audio = False
-        self.sent_data = False
 
         self.recording_stream = sounddevice.RawInputStream(latency='low', channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16)
         self.playing_stream = sounddevice.RawOutputStream(latency='low', channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16)
@@ -118,9 +116,6 @@ class Client:
 
 
     def receive_tcp_data_loop(self):
-        while not self.sent_data:
-            sleep(0.1)
-
         while not self.exiting:
             try:
                 packet_bytes = self.tcp_data_socket.recv(consts.PACKET_SIZE)
