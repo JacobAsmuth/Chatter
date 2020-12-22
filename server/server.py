@@ -95,8 +95,8 @@ class Server:
     def receive_voice_loop(self):
         while not self.closing:
             try:
-                data, address = self.voice_socket.recvfrom(consts.PACKET_SIZE)
-                packet: packets.ClientVoiceFramePacket = pickle.loads(data)
+                raw_bytes, address = self.voice_socket.recvfrom(consts.PACKET_SIZE)
+                packet: packets.ClientVoiceFramePacket = pickle.loads(raw_bytes)
                 client = self.get_client_object(packet.clientId, voice_address=address)
                 client.add_voice_frame(packet)
             except Exception:
@@ -105,8 +105,8 @@ class Server:
     def receive_data_loop(self):
         while not self.closing:
             try:
-                data, address = self.data_socket.recvfrom(consts.PACKET_SIZE)
-                packet: packets.ClientPacket = pickle.loads(data)
+                raw_bytes, address = self.data_socket.recvfrom(consts.PACKET_SIZE)
+                packet: packets.ClientPacket = pickle.loads(raw_bytes)
                 client = self.get_client_object(packet.clientId, data_address=address)
                 client.handle_packet(packet)
             except Exception as e: 
@@ -140,18 +140,14 @@ class Server:
 
     def update_settings_command(self, _):
         for client in self.clients.values():
-            client.send_data(packets.ServerSettingsPacket(1, 2))
+            client.send_data(packets.ServerSettingsPacket(1, 2, 3))
 
     def change_audio_mixer_command(self, args):
-        mixer = args[0]
         mixer_map = {
-            'array': (array_mixer, 'ArrayMixer'),
+            'array': (array_mixer.ArrayMixer),
         }
-        mixer_module, mixer_type_name = mixer_map[mixer]
-        loaded_module = importlib.reload(mixer_module)
-        mixer_map[mixer] = (loaded_module, mixer_type_name)
         with self.audio_mixer_lock:
-            self.audio_mixer = getattr(loaded_module, mixer_type_name)()
+            self.audio_mixer = mixer_map[args[0]]()
 
 
     def wait_for_commands(self):

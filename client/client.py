@@ -27,7 +27,7 @@ class Client:
         self.voice_port = None
         self.data_port = None
         self.client_id = random.getrandbits(64)
-        self.settings = packets.ServerSettingsPacket(0, 0)
+        self.settings = packets.ServerSettingsPacket(3, 0, 0.2)
         self.encoding_state = None
         self.decoding_state = None
         self.send_data_lock = Lock()
@@ -64,7 +64,7 @@ class Client:
         self.server_voice_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.server_data_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-        print("Initializing microphone recording...")
+        print("Initializing...") 
         threading.Thread(target=self.send_audio_loop, daemon=True).start()
         threading.Thread(target=self.receive_audio_loop, daemon=True).start()
 
@@ -130,9 +130,8 @@ class Client:
 
             except WindowsError as e:
                 if not self.exiting:
-                    print("Error with data socket: %s, closing data and voice connections." % (e,))
-                    self.server_data_socket.close()
-                    self.server_voice_socket.close()
+                    print("Error with data socket: %s, closing connections." % (e,))
+                    self.close()
                 break
             except Exception as e:
                 if not self.exiting:
@@ -164,7 +163,7 @@ class Client:
                     raw_audio += bytes(0 for _ in range(delta))
 
                 encoded_audio, self.encoding_state = audioop.lin2adpcm(raw_audio, consts.BYTES_PER_SAMPLE, self.encoding_state)
-                packet = packets.ClientVoiceFramePacket(frameId=time(), clientId=self.client_id, voiceData=encoded_audio)
+                packet = packets.ClientVoiceFramePacket(frameId=time(), clientId=self.client_id, voiceFrame=encoded_audio)
                 packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
 
                 self.server_voice_socket.sendto(packet_bytes, self.voice_addr)
@@ -182,7 +181,7 @@ class Client:
             try:
                 raw_bytes, _ = self.server_voice_socket.recvfrom(consts.PACKET_SIZE)
                 packet: packets.ServerVoiceFramePacket = pickle.loads(raw_bytes)
-                decoded_voice, self.decoding_state = audioop.adpcm2lin(packet.voiceData, consts.BYTES_PER_SAMPLE, self.decoding_state)
+                decoded_voice, self.decoding_state = audioop.adpcm2lin(packet.voiceFrame, consts.BYTES_PER_SAMPLE, self.decoding_state)
                 self.voice_buffer.add_frame(packet.frameId, decoded_voice)
             except WindowsError as e:
                 if not self.exiting:

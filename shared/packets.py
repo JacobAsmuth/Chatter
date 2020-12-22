@@ -8,12 +8,12 @@ class ClientPacket:
 @dataclass
 class ClientVoiceFramePacket(ClientPacket):
     frameId: float
-    voiceData: bytes
+    voiceFrame: bytes
 
 @dataclass
 class ServerVoiceFramePacket:
     frameId: float
-    voiceData: bytes    
+    voiceFrame: bytes    
 
 @dataclass
 class AudioLevelsPacket(ClientPacket):

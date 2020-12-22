@@ -6,26 +6,26 @@ import shared.consts as consts
  
 class ArrayMixer(AudioMixerBase):
     # This function runs len(clients) * 20 times per second. Efficiency is key. 
-    def mix(_, destination_client: ClientObject, all_voice_data: dict):
-        samples = []
+    def mix(_, destination_client: ClientObject, all_voice_frames: dict):
+        frames = []
         sample_gains = []
 
-        for source_client, source_audio in all_voice_data.items():
+        for source_client, voice_frame in all_voice_frames.items():
             if source_client is destination_client:
                 continue
 
             gain = destination_client.audio_levels_map[source_client.player_id]
 
             if gain > 0:
-                samples.append(source_audio)
+                frames.append(voice_frame)
                 sample_gains.append(gain)
 
-        if len(samples) == 0:
+        if len(frames) == 0:
             return None
 
-        ratio = 1/len(samples)
+        ratio = 1/len(frames)
         final_sample = None
-        for sample, gain in zip(samples, sample_gains):
+        for sample, gain in zip(frames, sample_gains):
             fragment = audioop.mul(sample, consts.BYTES_PER_SAMPLE, gain * ratio)
             if final_sample == None:
                 final_sample = fragment
