@@ -11,7 +11,7 @@ import time
 import sys
 
 def install_new_packages():
-    subprocess.run(["python", '-m', "pip", "install", '-r', "requirements.txt"])
+    subprocess.run(["python", '-m', "pip", "install", '-r', "requirements.txt"], capture_output=True)
 
 def restart_program():
     os.execv(sys.executable, ['python'] + sys.argv)
