@@ -15,8 +15,7 @@ def install_new_packages():
     pip.main(["install", '-r', 'requirements.txt'])
 
 def restart_program():
-    print('execuable: %s' % (sys.executable,))
-    os.execl(sys.executable, '"%s"' % (sys.executable,), *sys.argv)
+    os.execv(sys.executable, ['python'] + sys.argv)
 
 def do_git_pull(cwd: str, did_pull: multiprocessing.Value):
     repo = git.Repo(cwd)
