@@ -52,6 +52,7 @@ class ClientObject:
             except Exception as e: 
                 if not self.closing:
                     print("Error in tcp data connection: %s" % (e,))
+                    self.close()
 
     def send_voice(self, frame) -> None:
         encoded_audio, self.encoding_state = audioop.lin2adpcm(frame, consts.BYTES_PER_SAMPLE, self.encoding_state)
