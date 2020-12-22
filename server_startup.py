@@ -2,7 +2,7 @@ from server.server import Server
 import shared.consts as consts
 from server.audio_mixers.array_mixer import ArrayMixer
 
-import pip
+import subprocess
 import os
 import inspect
 import multiprocessing
@@ -11,7 +11,7 @@ import time
 import sys
 
 def install_new_packages():
-    pip.main(["install", '-r', 'requirements.txt', '-q'])
+    subprocess.run("python -m pip install -r requirements.txt")
 
 def restart_program():
     os.execv(sys.executable, ['python'] + sys.argv)
