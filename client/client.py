@@ -158,7 +158,7 @@ class Client:
 
         while not self.exiting:
             try:
-                raw_audio = self.recording_stream.read(consts.SAMPLES_PER_CHUNK)[0]
+                raw_audio, _ = self.recording_stream.read(consts.SAMPLES_PER_CHUNK)
                 encoded_audio, self.encoding_state = audioop.lin2adpcm(raw_audio, consts.BYTES_PER_SAMPLE, self.encoding_state)
                 packet = packets.ClientVoiceFramePacket(frameId=time(), clientId=self.client_id, voiceData=encoded_audio)
                 packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
@@ -197,7 +197,6 @@ class Client:
             samples = self.voice_buffer.get_samples()
             if samples is not None:
                 self.playing_stream.write(samples)
-            sleep(consts.OUTPUT_BLOCK_TIME)
 
     def _poll_among_us(self):
         if not self.among_us_memory.open_process():
