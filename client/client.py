@@ -270,7 +270,7 @@ class Client:
             print(command)
     
     def volume_command(self, args):
-        self.send(packets.VolumePacket(float(args[1])))
+        self.send(packets.VolumePacket(float(args[0])))
 
     def server_settings_packet_handler(self, packet: packets.ServerSettingsPacket):
         for field in packet.__dataclass_fields__:
