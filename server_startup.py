@@ -16,8 +16,8 @@ def install_new_packages():
 def restart_program():
     os.execv(sys.executable, ['python'] + sys.argv)
 
-# According to the documentation the 'git' library shouldn't be used in long-running programs due to memory leaks
-# So we run it in a seperate process I guess.
+# According to the documentation the 'git' library shouldn't be used in long-running programs due to memory leaks,
+#   so we run it in a seperate process I guess.
 def do_git_pull(cwd: str, did_pull: multiprocessing.Value):
     import git
     repo = git.Repo(cwd)
