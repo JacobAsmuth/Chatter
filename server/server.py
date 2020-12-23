@@ -37,7 +37,7 @@ class Server:
         with open("server/offsets/offsets.yaml", 'r') as f:
             self.offsets = yaml.load(f, Loader=yaml.FullLoader)
         self.settings_filepath = consts.SERVER_SETTINGS_FILE
-        self.settings = self._try_load(self.settings_filepath)
+        self.settings = self._try_load_settings()
 
     def setup_voice(self, port):
         self.voice_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -236,13 +236,13 @@ class Server:
         self.join_id += 1
         return self.join_id - 1
 
-    def _try_load(self) -> Settings:
+    def _try_load_settings(self) -> Settings:
         if os.path.isfile(self.settings_filepath):
             with open(self.settings_filepath, 'rb') as f:
                 try:
                     return pickle.load(f)
                 except:
-                    return Settings()
+                    pass
         return Settings()
 
     def save_settings(self) -> None:
