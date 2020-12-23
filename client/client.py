@@ -232,7 +232,7 @@ class Client:
             try:
                 memory_read = self.among_us_memory.read()
                 if memory_read.local_player:
-                    ids, gains = self.audio_engine.get_audio_levels(memory_read)
+                    ids, gains = self.audio_engine.get_audio_levels(memory_read, self.settings)
                     self.send(packets.AudioLevelsPacket(clientId=self.client_id,
                                                         playerId=memory_read.local_player.playerId,
                                                         playerIds=ids,
