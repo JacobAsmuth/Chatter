@@ -1,6 +1,6 @@
 import abc
 from server.client_object import ClientObject
-from server.server import ServerSettings
+from server.settings import ServerSettings
  
 class AudioMixerBase(abc.ABC):
 
