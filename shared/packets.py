@@ -38,3 +38,7 @@ class ServerSettingsPacket:
     voice_distance: float
     wall_attenuation: float
     lowest_hearable_volume: float
+
+@dataclass
+class ServerRestartingPacket:
+    pass

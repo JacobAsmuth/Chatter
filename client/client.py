@@ -33,6 +33,7 @@ class Client:
         self.send_data_lock = Lock()
         self.voice_buffer = JitterBuffer(consts.MIN_BUFFER_SIZE, consts.MAX_BUFFER_SIZE)
 
+        self.muted = False
         self.voice_socket = None
         self.udp_data_socket = None
 
@@ -41,11 +42,13 @@ class Client:
             'exit': self.exit_command,
             'retry': self.retry_command,
             'volume': self.volume_command,
+            'mute': self.mute_command,
         }
 
         self.packet_handlers = {
             packets.ServerSettingsPacket: self.server_settings_packet_handler,
             packets.OffsetsResponsePacket: self.offsets_response_packet_handler,
+            packets.ServerRestartingPacket: self.retry_command,
         }
 
     def connect(self, ip, voice_port, data_port):
@@ -55,8 +58,8 @@ class Client:
         self.data_port = data_port
         self.sent_audio = False
 
-        self.recording_stream = sounddevice.RawInputStream(latency='low', channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16)
-        self.playing_stream = sounddevice.RawOutputStream(latency='low', channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16)
+        self.recording_stream = sounddevice.RawInputStream(channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16)
+        self.playing_stream = sounddevice.RawOutputStream(channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16)
 
         self.voice_addr = (self.ip, self.voice_port)
         self.data_addr = (self.ip, self.data_port)
@@ -202,9 +205,8 @@ class Client:
         self.playing_stream.start()
         while not self.exiting:
             samples = self.voice_buffer.get_samples()
-            if samples is not None:
+            if samples is not None and not self.muted:
                 self.playing_stream.write(samples)
-            sleep(0.01)
 
     def _poll_among_us(self):
         if not self.among_us_memory.open_process():
@@ -266,6 +268,9 @@ class Client:
     
     def volume_command(self, args):
         self.send(packets.VolumePacket(float(args[0])))
+
+    def mute_command(self, _):
+        self.muted = not self.muted
 
     def server_settings_packet_handler(self, packet: packets.ServerSettingsPacket):
         for field in packet.__dataclass_fields__:

@@ -34,7 +34,7 @@ def update_if_possible(server: Server) -> bool:
         proc.start()
         proc.join()
         if did_pull.value == 1:
-            server.close()
+            server.restarting()
             print("Found new update, restarting!")
             install_new_packages()
             restart_program()
