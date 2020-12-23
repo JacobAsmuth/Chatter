@@ -203,6 +203,7 @@ class Client:
             samples = self.voice_buffer.get_samples()
             if samples is not None and not self.muted:
                 self.playing_stream.write(samples)
+            sleep(0.01)
 
     def _poll_among_us(self):
         if not self.among_us_memory.open_process():
@@ -219,19 +220,23 @@ class Client:
             sleep(2)
             self.send(packets.OffsetsRequestPacket())  # gotta resend, packet might've been dropped
 
+    def read_memory_and_send(self):
+        memory_read = self.among_us_memory.read()
+        if memory_read.local_player:
+            names, gains = self.audio_engine.get_audio_levels(memory_read, self.settings)
+
+            self.send(packets.AudioLevelsPacket(clientId=self.client_id,
+                                                playerName=memory_read.local_player.name,
+                                                playerNames=names,
+                                                gains=gains), tcp=False)
+
     def read_memory_loop(self):
         self._get_offsets()
         self._poll_among_us()
 
         while not self.exiting:
             try:
-                memory_read = self.among_us_memory.read()
-                if memory_read.local_player:
-                    names, gains = self.audio_engine.get_audio_levels(memory_read, self.settings)
-                    self.send(packets.AudioLevelsPacket(clientId=self.client_id,
-                                                        playerName=memory_read.local_player.name,
-                                                        playerNames=names,
-                                                        gains=gains), tcp=False)
+                self.read_memory_and_send()
                 sleep(0.05)
             except Exception as e:
                 print("Error in memory loop: %s" % (e,))

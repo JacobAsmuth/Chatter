@@ -5,15 +5,23 @@ import shared.consts as consts
 from client.audio_engines.linear import Linear
 
 def main(args):
+    #import yappi
+    #yappi.set_clock_type("cpu")
+    #yappi.start()
     mem = memory.AmongUsMemory()
     linear_audio = Linear()
 
-    client = Client(mem, linear_audio)
-    if len(args) == 0:
-        client.connect(consts.SERVER_AWS_IP, consts.VOICE_PORT, consts.DATA_PORT)
-    else:
-        client.connect(args[0], consts.VOICE_PORT, consts.DATA_PORT)
-    client.wait_for_commands()
+    try:
+        client = Client(mem, linear_audio)
+        if len(args) == 0:
+            client.connect(consts.SERVER_AWS_IP, consts.VOICE_PORT, consts.DATA_PORT)
+        else:
+            client.connect(args[0], consts.VOICE_PORT, consts.DATA_PORT)
+        client.wait_for_commands()
+    except SystemExit:
+        pass
+        #yappi.get_func_stats().print_all()
+        #yappi.get_thread_stats().print_all()
 
 
 if __name__ == "__main__":
