@@ -26,4 +26,6 @@ MAX_BUFFER_SIZE = 10
 
 GIT_UPDATE_CHECK_FREQUENCY = 10  # seconds
 
+SERVER_SETTINGS_FILE = 'settings.pkl'
+
 ACK_MSG = bytes([0])

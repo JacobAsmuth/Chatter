@@ -45,7 +45,7 @@ class Client:
         }
 
         self.packet_handlers = {
-            packets.ServerSettingsPacket: self.server_settings_packet_handler,
+            packets.ClientSettingsPacket: self.client_settings_packet_handler,
             packets.OffsetsResponsePacket: self.offsets_response_packet_handler,
             packets.ServerRestartingPacket: self.retry_command,
         }
@@ -271,7 +271,7 @@ class Client:
     def mute_command(self, _):
         self.muted = not self.muted
 
-    def server_settings_packet_handler(self, packet: packets.ServerSettingsPacket):
+    def client_settings_packet_handler(self, packet: packets.ServerSettingsPacket):
         for field in packet.__dataclass_fields__:
              val = getattr(packet, field)
              if val is not None:

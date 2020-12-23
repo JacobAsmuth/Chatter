@@ -3,15 +3,16 @@ import pickle
 import socket
 import threading
 from time import time, sleep
-import importlib
 import yaml
 # internal libs
 from server.client_object import ClientObject
 from server.audio_mixers.base import AudioMixerBase
+from server.settings import Settings
 import server.audio_mixers.array_mixer as array_mixer
 import shared.consts as consts
 import shared.packets as packets
 from sys import exit
+import os
 
 class Server:
     def __init__(self, audio_mixer: AudioMixerBase):
@@ -30,10 +31,13 @@ class Server:
             'clients': self.clients_command,
             'update': self.update_settings_command,
             'mixer': self.change_audio_mixer_command,
+            'ignoregain': self.toggle_ignore_gain_command,
         }
         self.closing = False
         with open("server/offsets/offsets.yaml", 'r') as f:
             self.offsets = yaml.load(f, Loader=yaml.FullLoader)
+        self.settings_filepath = consts.SERVER_SETTINGS_FILE
+        self.settings = self._try_load(self.settings_filepath)
 
     def setup_voice(self, port):
         self.voice_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -91,7 +95,7 @@ class Server:
                     for client in self.clients.values():
                         if client.voice_address is None:
                             continue
-                        final_audio = self.audio_mixer.mix(client, voice_frames)
+                        final_audio = self.audio_mixer.mix(client, voice_frames, self.settings)
                         if final_audio is None:
                             continue
                         try:
@@ -199,6 +203,9 @@ class Server:
         with self.audio_mixer_lock:
             self.audio_mixer = mixer_map[args[0]]()
 
+    def toggle_ignore_gain_command(self, _):
+        self.settings.ignore_client_gain = not self.settings.ignore_client_gain
+        self.save_settings()
 
     def wait_for_commands(self):
         print("Accepting new connections. Type help for available commands.")
@@ -228,3 +235,16 @@ class Server:
     def get_next_join_id(self):
         self.join_id += 1
         return self.join_id - 1
+
+    def _try_load(self) -> Settings:
+        if os.path.isfile(self.settings_filepath):
+            with open(self.settings_filepath, 'rb') as f:
+                try:
+                    return pickle.load(f)
+                except:
+                    return Settings()
+        return Settings()
+
+    def save_settings(self) -> None:
+        with open(self.settings_filepath, 'wb') as f:
+            pickle.dump(self.settings, f, protocol=consts.PICKLE_PROTOCOL)

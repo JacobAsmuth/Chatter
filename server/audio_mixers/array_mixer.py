@@ -2,30 +2,37 @@ import audioop
 
 from server.audio_mixers.base import AudioMixerBase
 from server.client_object import ClientObject
+from server.settings import Settings
 import shared.consts as consts
  
 class ArrayMixer(AudioMixerBase):
-    # This function runs len(clients) * 20 times per second. Efficiency is key. 
-    def mix(_, destination_client: ClientObject, all_voice_frames: dict):
+    @staticmethod 
+    def get_frames_and_gains(destination_client: ClientObject, all_voice_frames: dict, settings: Settings):
         frames = []
         sample_gains = []
-
+        ignore_client_gain = settings.ignore_client_gain
         for source_client, voice_frame in all_voice_frames.items():
             if source_client is destination_client:
                 continue
 
-            gain = destination_client.audio_levels_map[source_client.player_name]
+            gain = ignore_client_gain + ignore_client_gain * destination_client.audio_levels_map[source_client.player_name]
 
             if gain > 0:
                 frames.append(voice_frame)
                 sample_gains.append(gain)
+
+
+    # This function runs len(clients) * (1/consts.OUTPUT_BLOCK_TIME) times per second.
+    @staticmethod
+    def mix(destination_client: ClientObject, all_voice_frames: dict, settings: Settings):
+        frames, gains = ArrayMixer.get_frames_and_gains(destination_client, all_voice_frames, settings)
 
         if len(frames) == 0:
             return None
 
         ratio = 1/len(frames)
         final_sample = None
-        for sample, gain in zip(frames, sample_gains):
+        for sample, gain in zip(frames, gains):
             fragment = audioop.mul(sample, consts.BYTES_PER_SAMPLE, gain * ratio)
             if final_sample == None:
                 final_sample = fragment
