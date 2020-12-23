@@ -164,14 +164,14 @@ class Server:
 
     def close(self):
         self.closing = True
-        for client in self.clients:
+        for client in self.clients.values():
             client.close()
         self.tcp_data_socket.close()
         self.udp_data_socket.close()
         self.voice_socket.close()
 
     def restarting(self):
-        for client in self.clients:
+        for client in self.clients.values():
             client.send(packets.ServerRestartingPacket())
         self.close()
 
