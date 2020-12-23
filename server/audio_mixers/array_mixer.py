@@ -40,4 +40,4 @@ class ArrayMixer(AudioMixerBase):
                 elif delta < 0:  # fragment bigger
                     final_sample = audioop.add(final_sample + bytes(0 for _ in range(-delta)), fragment, consts.BYTES_PER_SAMPLE)
         
-        return audioop.mul(final_sample, consts.BYTES_PER_SAMPLE, destination_client.volume)
+        return audioop.mul(final_sample, consts.BYTES_PER_SAMPLE, destination_client.volume * len(frames))

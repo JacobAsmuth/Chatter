@@ -119,7 +119,6 @@ class Client:
         while not self.exiting:
             try:
                 packet_bytes = self.tcp_data_socket.recv(consts.PACKET_SIZE)
-                print("received %s bytes " % (len(packet_bytes),))
                 if len(packet_bytes) == 0:
                     self.close()
 
@@ -239,7 +238,7 @@ class Client:
                                                         gains=gains), tcp=False)
                 sleep(0.05)
             except Exception as e:
-                print(e)
+                print("Error in memory loop: %s" % (e,))
                 sleep(5)
                 self._poll_among_us()
             
