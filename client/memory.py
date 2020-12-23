@@ -115,7 +115,7 @@ class AmongUsMemory:
         allPlayers = self.read_memory(allPlayersPtr, self.offsets['allPlayers'], self.pm.read_ulonglong)
         playerCount = self.read_memory(allPlayersPtr, self.offsets['playerCount'], self.pm.read_int)
         playerAddrPtr = allPlayers + self.offsets['playerAddrPtr']
-        #exiledPlayerId = self.read_memory(self.base_addr, self.offsets['exiledPlayerId'], self.pm.read_uchar)
+        exiledPlayerId = self.read_memory(self.base_addr, self.offsets['exiledPlayerId'], self.pm.read_uchar)
         players = []
         local_player = None
 
