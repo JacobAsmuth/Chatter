@@ -160,7 +160,7 @@ class Client:
             try:
                 raw_audio, _ = self.recording_stream.read(consts.SAMPLES_PER_FRAME)
                 #encoded_audio, self.encoding_state = audioop.lin2adpcm(raw_audio, consts.BYTES_PER_SAMPLE, self.encoding_state)
-                packet = packets.ClientVoiceFramePacket(frameId=time(), clientId=self.client_id, voiceFrame=raw_audio)
+                packet = packets.ClientVoiceFramePacket(frameId=time(), clientId=self.client_id, voiceFrame=bytes(raw_audio))
                 packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
 
                 self.voice_socket.sendto(packet_bytes, self.voice_addr)
