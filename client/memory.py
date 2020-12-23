@@ -75,9 +75,7 @@ class AmongUsMemory:
         if game_state == 1 or game_state == 3:
             state = GameState.LOBBY
         else:
-            if self.exile_causes_end:
-                state = GameState.LOBBY
-            elif meeting_hud_state < 4:
+            if meeting_hud_state < 4:
                 state = GameState.DISCUSSION
             else:
                 state = GameState.MEANDERING
