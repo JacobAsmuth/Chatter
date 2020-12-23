@@ -12,10 +12,10 @@ pymem.logger.setLevel(pymem.logging.CRITICAL)
 @dataclass
 class Player:
     playerId: int
+    name: str
     dead: bool
     disconnected: bool
     impostor: bool
-    exiled: bool
     isLocal: bool
     inVent: bool
     pos: np.ndarray
@@ -24,7 +24,7 @@ class GameState(enum.Enum):
     MENU = 0
     LOBBY = 1
     DISCUSSION = 2
-    TASKS = 3
+    MEANDERING = 3
 
 @dataclass
 class MemoryRead:
@@ -37,7 +37,6 @@ class MemoryRead:
 class AmongUsMemory:
     def __init__(self):
         self.pm = None
-        self.exile_causes_end = False
         self.offsets = None
         self.struct_format = None
 
@@ -73,17 +72,15 @@ class AmongUsMemory:
         state = GameState.MENU
         if game_state == 0:
             state = GameState.MENU
-            self.exile_causes_end = False
         if game_state == 1 or game_state == 3:
             state = GameState.LOBBY
-            self.exile_causes_end = False
         else:
             if self.exile_causes_end:
                 state = GameState.LOBBY
             elif meeting_hud_state < 4:
                 state = GameState.DISCUSSION
             else:
-                state = GameState.TASKS
+                state = GameState.MEANDERING
         return state
 
     def _get_meeting_hud_state(self):
@@ -115,14 +112,13 @@ class AmongUsMemory:
         allPlayers = self.read_memory(allPlayersPtr, self.offsets['allPlayers'], self.pm.read_ulonglong)
         playerCount = self.read_memory(allPlayersPtr, self.offsets['playerCount'], self.pm.read_int)
         playerAddrPtr = allPlayers + self.offsets['playerAddrPtr']
-        exiledPlayerId = self.read_memory(self.base_addr, self.offsets['exiledPlayerId'], self.pm.read_uchar)
         players = []
         local_player = None
 
         for _ in range(min(playerCount, 10)):
             address, last = self.offset_address(playerAddrPtr, self.offsets['player']['offsets'])
             playerData = self.pm.read_bytes(address + last, self.offsets['player']['bufferLength'])
-            player = self._parse_player(playerData, 0)
+            player = self._parse_player(playerData)
             playerAddrPtr += 4
             if player.isLocal:
                 local_player = player
@@ -130,7 +126,7 @@ class AmongUsMemory:
                 players.append(player)
         return players, local_player
 
-    def _parse_player(self, data, exiledPlayerId):
+    def _parse_player(self, data):
         values = self._named_fields_from_struct(struct.unpack(self.struct_format, data))
         object_ptr = values['objectPtr']
 
@@ -143,7 +139,7 @@ class AmongUsMemory:
         in_vent = self.read_memory(object_ptr, self.offsets['player']['inVent'], self.pm.read_uchar) != 0
 
         return Player(
-            exiled=False,
+            name=self.read_string(values['name']),
             playerId=values['id'],
             disconnected=values['disconnected'],
             impostor=values['impostor'],

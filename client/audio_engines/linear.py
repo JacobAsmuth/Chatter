@@ -13,7 +13,7 @@ class Linear(base.AudioEngineBase):
         if lp is None:
             return [], []
 
-        player_ids = []
+        player_names = []
         gains = []
         lp_pos = lp.pos
         lp_dead = lp.dead
@@ -23,14 +23,16 @@ class Linear(base.AudioEngineBase):
             for p in memory_read.players:
                 gain = 1 * (lp_dead == p.dead)
 
-                player_ids.append(p.playerId)
+                player_names.append(p.name)
                 gains.append(gain)
         else:
             for p in memory_read.players:
                 dist = abs(np.linalg.norm(lp_pos - p.pos))
                 gain = (1-(dist/max_dist)) * (dist < max_dist) * (lp_dead == p.dead) # branchless
+                both_in_vent = lp.inVent and p.inVent
+                gain = both_in_vent + ((not both_in_vent) * gain) # 1 if both in vent, 'gain' otherwise
 
-                player_ids.append(p.playerId)
+                player_names.append(p.name)
                 gains.append(gain)
 
-        return player_ids, gains
+        return player_names, gains

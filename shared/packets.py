@@ -17,8 +17,8 @@ class ServerVoiceFramePacket:
 
 @dataclass
 class AudioLevelsPacket(ClientPacket):
-    playerId: int
-    playerIds: List[int]
+    playerName: str
+    playerNames: List[str]
     gains: List[float]
 
 @dataclass

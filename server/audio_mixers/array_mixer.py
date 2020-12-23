@@ -14,8 +14,7 @@ class ArrayMixer(AudioMixerBase):
             if source_client is destination_client:
                 continue
 
-            #gain = destination_client.audio_levels_map[source_client.player_id]
-            gain = 1
+            gain = destination_client.audio_levels_map[source_client.player_name]
 
             if gain > 0:
                 frames.append(voice_frame)
@@ -36,7 +35,7 @@ class ArrayMixer(AudioMixerBase):
                 # Delta==0 is the 99.9999% case. Run it first to save a few checks.
                 if delta == 0:
                     final_sample = audioop.add(final_sample, fragment, consts.BYTES_PER_SAMPLE)
-                if delta > 0:  # final sample bigger
+                elif delta > 0:  # final sample bigger
                     final_sample = audioop.add(final_sample, fragment + bytes(0 for _ in range(delta)), consts.BYTES_PER_SAMPLE)
                 elif delta < 0:  # fragment bigger
                     final_sample = audioop.add(final_sample + bytes(0 for _ in range(-delta)), fragment, consts.BYTES_PER_SAMPLE)

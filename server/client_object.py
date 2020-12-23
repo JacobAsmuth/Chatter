@@ -24,7 +24,7 @@ class ClientObject:
         self.decoding_state = None
         self.offsets = offsets
         self.closing = False
-        self.player_id = None  # In-game player ID
+        self.player_name = None  # AmongUs In-game name
         self.voice_buffer = JitterBuffer(consts.MIN_BUFFER_SIZE, consts.MAX_BUFFER_SIZE)
         self.audio_levels_map = collections.defaultdict(float)
         self.packet_handlers = {
@@ -80,9 +80,9 @@ class ClientObject:
         self.packet_handlers[packet_type](packet)
 
     def audio_levels_packet_handler(self, packet: packets.AudioLevelsPacket) -> None:
-        self.player_id = packet.playerId
-        for player_id, gain in zip(packet.playerIds, packet.gains):
-            self.audio_levels_map[player_id] = gain
+        self.player_name = packet.playerName
+        for player_name, gain in zip(packet.playerNames, packet.gains):
+            self.audio_levels_map[player_name] = gain
 
     def offsets_request_packet_handler(self, _: packets.OffsetsRequestPacket) -> None:
         self.send(packets.OffsetsResponsePacket(self.offsets))

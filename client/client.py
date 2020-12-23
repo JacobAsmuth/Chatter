@@ -1,4 +1,3 @@
-from struct import pack
 import sounddevice
 import socket
 import threading
@@ -165,9 +164,6 @@ class Client:
         while not self.exiting:
             try:
                 raw_audio, _ = self.recording_stream.read(consts.SAMPLES_PER_FRAME)
-                delta = len(raw_audio) - consts.BYTES_PER_SAMPLE
-                if delta < 0:  # The framework 'guarantees' this will never happen, but with some people it happens all the time.
-                    raw_audio += bytes(0 for _ in range(delta))
 
                 encoded_audio, self.encoding_state = audioop.lin2adpcm(raw_audio, consts.BYTES_PER_SAMPLE, self.encoding_state)
                 packet = packets.ClientVoiceFramePacket(frameId=time(), clientId=self.client_id, voiceFrame=encoded_audio)
