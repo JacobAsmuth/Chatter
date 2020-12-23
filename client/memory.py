@@ -73,10 +73,10 @@ class AmongUsMemory:
         state = GameState.MENU
         if game_state == 0:
             state = GameState.MENU
-            self.exile_causes_end = True
+            self.exile_causes_end = False
         if game_state == 1 or game_state == 3:
             state = GameState.LOBBY
-            self.exile_causes_end = True
+            self.exile_causes_end = False
         else:
             if self.exile_causes_end:
                 state = GameState.LOBBY
@@ -122,7 +122,7 @@ class AmongUsMemory:
         for _ in range(min(playerCount, 10)):
             address, last = self.offset_address(playerAddrPtr, self.offsets['player']['offsets'])
             playerData = self.pm.read_bytes(address + last, self.offsets['player']['bufferLength'])
-            player = self._parse_player(address + last, playerData, 0)
+            player = self._parse_player(playerData, 0)
             playerAddrPtr += 4
             if player.isLocal:
                 local_player = player
@@ -130,7 +130,7 @@ class AmongUsMemory:
                 players.append(player)
         return players, local_player
 
-    def _parse_player(self, addr, data, exiledPlayerId):
+    def _parse_player(self, data, exiledPlayerId):
         values = self._named_fields_from_struct(struct.unpack(self.struct_format, data))
         object_ptr = values['objectPtr']
 
