@@ -81,8 +81,7 @@ class ClientObject:
 
     def audio_levels_packet_handler(self, packet: packets.AudioLevelsPacket) -> None:
         if self.player_name == "Jacob":
-            zach = None
-            print("Levels: " % (packet.gains,))
+            print("Levels: %s" % (packet.gains,))
         self.player_name = packet.playerName
         for player_name, gain in zip(packet.playerNames, packet.gains):
             self.audio_levels_map[player_name] = gain
