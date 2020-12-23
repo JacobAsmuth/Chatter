@@ -219,11 +219,9 @@ class Client:
     def _get_offsets(self):
         print("Asking for offsets from server...")
         self.send(packets.OffsetsRequestPacket())
-        sleep(2)
         while not self.among_us_memory.has_offsets():
             sleep(2)
             self.send(packets.OffsetsRequestPacket())  # gotta resend, packet might've been dropped
-        print("Offsets recived!")
 
     def read_memory_loop(self):
         self._get_offsets()
