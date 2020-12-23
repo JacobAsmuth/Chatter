@@ -26,7 +26,7 @@ class Client:
         self.voice_port = None
         self.data_port = None
         self.client_id = random.getrandbits(64)
-        self.settings = packets.ServerSettingsPacket(3, 0, 0.2)
+        self.settings = packets.ClientSettingsPacket()
         self.encoding_state = None
         self.decoding_state = None
         self.send_data_lock = Lock()
@@ -271,7 +271,7 @@ class Client:
     def mute_command(self, _):
         self.muted = not self.muted
 
-    def client_settings_packet_handler(self, packet: packets.ServerSettingsPacket):
+    def client_settings_packet_handler(self, packet: packets.ClientSettingsPacket):
         for field in packet.__dataclass_fields__:
              val = getattr(packet, field)
              if val is not None:

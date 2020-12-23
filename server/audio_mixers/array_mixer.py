@@ -6,22 +6,6 @@ from server.settings import Settings
 import shared.consts as consts
  
 class ArrayMixer(AudioMixerBase):
-    @staticmethod 
-    def get_frames_and_gains(destination_client: ClientObject, all_voice_frames: dict, settings: Settings):
-        frames = []
-        sample_gains = []
-        ignore_client_gain = settings.ignore_client_gain
-        for source_client, voice_frame in all_voice_frames.items():
-            if source_client is destination_client:
-                continue
-
-            gain = ignore_client_gain + ignore_client_gain * destination_client.audio_levels_map[source_client.player_name]
-
-            if gain > 0:
-                frames.append(voice_frame)
-                sample_gains.append(gain)
-
-
     # This function runs len(clients) * (1/consts.OUTPUT_BLOCK_TIME) times per second.
     @staticmethod
     def mix(destination_client: ClientObject, all_voice_frames: dict, settings: Settings):
@@ -48,3 +32,19 @@ class ArrayMixer(AudioMixerBase):
                     final_sample = audioop.add(final_sample + bytes(0 for _ in range(-delta)), fragment, consts.BYTES_PER_SAMPLE)
         
         return audioop.mul(final_sample, consts.BYTES_PER_SAMPLE, destination_client.volume * len(frames))
+
+    @staticmethod 
+    def get_frames_and_gains(destination_client: ClientObject, all_voice_frames: dict, settings: Settings):
+        frames = []
+        gains = []
+        ignore_client_gain = settings.ignore_client_gain
+        for source_client, voice_frame in all_voice_frames.items():
+            if source_client is destination_client:
+                continue
+
+            gain = ignore_client_gain + ignore_client_gain * destination_client.audio_levels_map[source_client.player_name]
+
+            if gain > 0:
+                frames.append(voice_frame)
+                gains.append(gain)
+        return frames, gains
