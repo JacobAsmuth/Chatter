@@ -194,7 +194,7 @@ class Server:
 
     def update_settings_command(self, _):
         for client in self.clients.values():
-            client.send_data(packets.ServerSettingsPacket(1, 2, 3))
+            client.send_data(packets.ClientSettingsPacket(1, 2, 3))
 
     def change_audio_mixer_command(self, args):
         mixer_map = {

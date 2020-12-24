@@ -57,8 +57,10 @@ class Client:
         self.data_port = data_port
         self.sent_audio = False
 
+
         self.recording_stream = sounddevice.RawInputStream(blocksize=consts.SAMPLES_PER_FRAME, channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16)
         self.playing_stream = sounddevice.RawOutputStream(blocksize=consts.SAMPLES_PER_FRAME, channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16, callback=self.play_callback)
+        self.playing_stream.start()
 
         self.voice_addr = (self.ip, self.voice_port)
         self.data_addr = (self.ip, self.data_port)
@@ -159,8 +161,8 @@ class Client:
         while not self.exiting:
             try:
                 raw_audio, _ = self.recording_stream.read(consts.SAMPLES_PER_FRAME)
-                #encoded_audio, self.encoding_state = audioop.lin2adpcm(raw_audio, consts.BYTES_PER_SAMPLE, self.encoding_state)
-                packet = packets.ClientVoiceFramePacket(frameId=time(), clientId=self.client_id, voiceFrame=bytes(raw_audio))
+                encoded_audio, self.encoding_state = audioop.lin2adpcm(raw_audio, consts.BYTES_PER_SAMPLE, self.encoding_state)
+                packet = packets.ClientVoiceFramePacket(frameId=time(), clientId=self.client_id, voiceFrame=encoded_audio)
                 packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
 
                 self.voice_socket.sendto(packet_bytes, self.voice_addr)
@@ -178,8 +180,8 @@ class Client:
             try:
                 raw_bytes, _ = self.voice_socket.recvfrom(consts.PACKET_SIZE)
                 packet: packets.ServerVoiceFramePacket = pickle.loads(raw_bytes)
-                #decoded_voice, self.decoding_state = audioop.adpcm2lin(packet.voiceFrame, consts.BYTES_PER_SAMPLE, self.decoding_state)
-                self.voice_buffer.add_frame(packet.frameId, packet.voiceFrame)
+                decoded_voice, self.decoding_state = audioop.adpcm2lin(packet.voiceFrame, consts.BYTES_PER_SAMPLE, self.decoding_state)
+                self.voice_buffer.add_frame(packet.frameId, decoded_voice)
             except WindowsError as e:
                 if not self.exiting:
                     self.close()
@@ -191,24 +193,10 @@ class Client:
                     print("Error receiving audio: " + str(e))
                 break
 
-    def play_audio_loop(self):
-        self.playing_stream.start()
-        while not self.exiting:
-            #samples = self.voice_buffer.get_samples()
-            #if samples is not None and not self.muted:
-            #    samples = pydub.AudioSegment(samples, sample_width=consts.BYTES_PER_SAMPLE, frame_rate=consts.SAMPLE_RATE, channels=consts.CHANNELS).raw_data
-            #    self.playing_stream.write(samples)
-            sleep(0.0001)
-
     def play_callback(self, outdata, frames: int, time, status):
         samples = self.voice_buffer.get_samples()
         if samples is not None and not self.muted:
-            len_samples = len(samples)
-            outdata[:len_samples] = samples
-            outdata[len_samples:] = b'\x00' * (len(outdata) - len_samples)
-        else:
-            outdata[:] = b'\x00' * len(outdata)
-        
+            outdata[:] = samples
 
     def _poll_among_us(self):
         if not self.among_us_memory.open_process():
