@@ -1,5 +1,4 @@
-from pyogg.opus_encoder import OpusEncoder
-from pyogg.opus_decoder import OpusDecoder
+from pyogg import OpusEncoder, OpusDecoder
 import shared.consts as consts
 
 class Encoder:
@@ -14,7 +13,6 @@ class Encoder:
 
         self._decoder.set_channels(consts.CHANNELS)
         self._decoder.set_sampling_frequency(consts.SAMPLE_RATE)
-
 
     def decode(self, frame: bytes) -> bytes:
         return self._decoder.decode(frame)
