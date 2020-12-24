@@ -16,14 +16,12 @@ class Encoder:
 
     def decode(self, frame: bytes) -> bytes:
         try:
-            return frame
             return self._decoder.decode(bytearray(frame))
         except Exception as e:
             print("Decode error: ", str(e))
 
     def encode(self, frame: bytes) -> bytes:
         try:
-            return frame
             return self._encoder.encode(frame).tobytes()
         except Exception as e:
             print("Encode error: ", str(e))
