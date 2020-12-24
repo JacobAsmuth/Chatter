@@ -61,9 +61,7 @@ class Client:
         self.voice_buffer = JitterBuffer(consts.MIN_BUFFER_SIZE, consts.MAX_BUFFER_SIZE)
 
         self.recording_stream = sounddevice.RawInputStream(blocksize=consts.SAMPLES_PER_FRAME, channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16, callback=self.read_audio_callback)
-        self.recording_stream.start()
         self.playing_stream = sounddevice.RawOutputStream(blocksize=consts.SAMPLES_PER_FRAME, channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16, callback=self.play_audio_callback)
-        self.playing_stream.start()
 
         self.voice_addr = (self.ip, self.voice_port)
         self.data_addr = (self.ip, self.data_port)
@@ -75,8 +73,9 @@ class Client:
 
         _ = self.tcp_data_socket.recv(len(consts.ACK_MSG))
 
+        self.recording_stream.start()
+        self.playing_stream.start()
         print("Connected to server, initializing...") 
-        #threading.Thread(target=self.send_audio_loop, daemon=True).start()
         threading.Thread(target=self.receive_audio_loop, daemon=True).start()
 
         threading.Thread(target=self.read_memory_loop, daemon=True).start()
@@ -156,21 +155,6 @@ class Client:
                 print("Server died: %s" % (e,))
         except Exception as e:
             print("Unable to send %s: %s" % (packet, e))
-                
-    def send_audio_loop(self):
-        while not self.exiting:
-            try:
-                raw_audio, _ = self.recording_stream.read(consts.SAMPLES_PER_FRAME)
-                #encoded_audio, self.encoding_state = audioop.lin2adpcm(raw_audio, consts.BYTES_PER_SAMPLE, self.encoding_state)
-                packet = packets.ClientVoiceFramePacket(frameId=time(), clientId=self.client_id, voiceFrame=self.encoder.encode(raw_audio))
-                packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
-
-                self.voice_socket.sendto(packet_bytes, self.voice_addr)
-                self.sent_audio = True
-            except Exception as e:
-                if not self.exiting:
-                    self.close()
-                    print("Error sending audio: " + str(e))
 
     def receive_audio_loop(self):
         while not self.sent_audio:
@@ -197,8 +181,8 @@ class Client:
         #encoded_audio, self.encoding_state = audioop.lin2adpcm(raw_audio, consts.BYTES_PER_SAMPLE, self.encoding_state)
         packet = packets.ClientVoiceFramePacket(frameId=time(), clientId=self.client_id, voiceFrame=self.encoder.encode(bytes(indata)))
         packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
-
         self.voice_socket.sendto(packet_bytes, self.voice_addr)
+        self.sent_audio = True
 
     def play_audio_callback(self, outdata, frames: int, time, status):
         samples = self.voice_buffer.get_samples()

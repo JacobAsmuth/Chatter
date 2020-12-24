@@ -5,3 +5,4 @@ ffmpeg.exe
 build/**
 dist/**
 *.spec
+*.pkl
