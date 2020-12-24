@@ -7,12 +7,12 @@ class ClientPacket:
 
 @dataclass
 class ClientVoiceFramePacket(ClientPacket):
-    frameId: int
+    frameId: float
     voiceFrame: bytes
 
 @dataclass
 class ServerVoiceFramePacket:
-    frameId: int
+    frameId: float
     voiceFrame: bytes    
 
 @dataclass
