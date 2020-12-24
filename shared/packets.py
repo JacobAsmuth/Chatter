@@ -7,12 +7,12 @@ class ClientPacket:
 
 @dataclass
 class ClientVoiceFramePacket(ClientPacket):
-    frameId: float
+    frameId: int
     voiceFrame: bytes
 
 @dataclass
 class ServerVoiceFramePacket:
-    frameId: float
+    frameId: int
     voiceFrame: bytes    
 
 @dataclass
@@ -38,6 +38,7 @@ class ClientSettingsPacket:
     voice_distance: float = 3
     wall_attenuation: float = 1
     lowest_hearable_volume: float = 0.2
+    haunting_ratio: float = 0.5
 
 @dataclass
 class ServerRestartingPacket:

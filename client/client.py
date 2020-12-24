@@ -164,7 +164,6 @@ class Client:
             try:
                 raw_bytes, _ = self.voice_socket.recvfrom(consts.PACKET_SIZE)
                 packet: packets.ServerVoiceFramePacket = pickle.loads(raw_bytes)
-                #decoded_voice, self.decoding_state = audioop.adpcm2lin(packet.voiceFrame, consts.BYTES_PER_SAMPLE, self.decoding_state)
                 self.voice_buffer.add_frame(packet.frameId, self.encoder.decode(packet.voiceFrame))
             except WindowsError as e:
                 if not self.exiting:
@@ -178,13 +177,12 @@ class Client:
                 break
 
     def read_audio_callback(self, indata, frames: int, time_, status_):
-        #encoded_audio, self.encoding_state = audioop.lin2adpcm(raw_audio, consts.BYTES_PER_SAMPLE, self.encoding_state)
         packet = packets.ClientVoiceFramePacket(frameId=time(), clientId=self.client_id, voiceFrame=self.encoder.encode(bytes(indata)))
         packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
         self.voice_socket.sendto(packet_bytes, self.voice_addr)
         self.sent_audio = True
 
-    def play_audio_callback(self, outdata, frames: int, time, status):
+    def play_audio_callback(self, outdata, frames: int, time_, status):
         samples = self.voice_buffer.get_samples()
         if samples is not None and not self.muted:
             outdata[:len(samples)] = samples
@@ -203,8 +201,7 @@ class Client:
         print("Asking for offsets from server...")
         self.send(packets.OffsetsRequestPacket())
         while not self.among_us_memory.has_offsets():
-            sleep(2)
-            self.send(packets.OffsetsRequestPacket())  # gotta resend, packet might've been dropped
+            sleep(0.1)
 
     def read_memory_and_send(self):
         memory_read = self.among_us_memory.read()

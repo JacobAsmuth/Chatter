@@ -11,7 +11,6 @@ class JitterBuffer(object):
     def __init__(self, min_frame_count: int, max_frame_count: int) -> None:
         self.min_frame_count = min_frame_count
         self.max_frame_count = max_frame_count
-        self.expected_next_frame_id = 0
 
         self.frames = deque()
 

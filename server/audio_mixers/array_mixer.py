@@ -27,9 +27,9 @@ class ArrayMixer(AudioMixerBase):
                 if delta == 0:
                     final_sample = audioop.add(final_sample, fragment, consts.BYTES_PER_SAMPLE)
                 elif delta > 0:  # final sample bigger
-                    final_sample = audioop.add(final_sample, fragment + bytes(0 for _ in range(delta)), consts.BYTES_PER_SAMPLE)
+                    final_sample = audioop.add(final_sample, fragment + bytes(delta), consts.BYTES_PER_SAMPLE)
                 elif delta < 0:  # fragment bigger
-                    final_sample = audioop.add(final_sample + bytes(0 for _ in range(-delta)), fragment, consts.BYTES_PER_SAMPLE)
+                    final_sample = audioop.add(final_sample + bytes(-delta), fragment, consts.BYTES_PER_SAMPLE)
         
         return audioop.mul(final_sample, consts.BYTES_PER_SAMPLE, destination_client.volume * len(frames))
 
@@ -38,11 +38,12 @@ class ArrayMixer(AudioMixerBase):
         frames = []
         gains = []
         ignore_client_gain = settings.ignore_client_gain
+        audio_levels_map = destination_client.audio_levels_map
         for source_client, voice_frame in all_voice_frames.items():
             if source_client is destination_client:
                 continue
 
-            gain = ignore_client_gain + ((not ignore_client_gain) * destination_client.audio_levels_map[source_client.player_name])
+            gain = ignore_client_gain + ((not ignore_client_gain) * audio_levels_map[source_client.player_name])
 
             if gain > 0:
                 frames.append(voice_frame)
