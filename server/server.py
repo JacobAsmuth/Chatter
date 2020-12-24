@@ -99,8 +99,7 @@ class Server:
                         if final_audio is None:
                             continue
                         try:
-                            for i in range(0, len(final_audio), consts.PACKET_SIZE):
-                                client.send_voice(final_audio[i:i+consts.PACKET_SIZE])
+                            client.send_voice(final_audio)
                         except Exception as e:
                             print("Error sending final audio: " + str(e))
             sleep(consts.OUTPUT_BLOCK_TIME)
