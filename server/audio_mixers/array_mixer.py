@@ -42,7 +42,7 @@ class ArrayMixer(AudioMixerBase):
             if source_client is destination_client:
                 continue
 
-            gain = ignore_client_gain + ignore_client_gain * destination_client.audio_levels_map[source_client.player_name]
+            gain = ignore_client_gain + ((not ignore_client_gain) * destination_client.audio_levels_map[source_client.player_name])
 
             if gain > 0:
                 frames.append(voice_frame)
