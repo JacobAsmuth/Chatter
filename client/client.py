@@ -185,9 +185,11 @@ class Client:
     def play_audio_callback(self, outdata, frames: int, time_, status):
         samples = self.voice_buffer.get_samples()
         if samples is not None and not self.muted:
-            outdata[:len(samples)] = samples
+            len_samples = len(samples)
+            outdata[:len_samples] = samples
+            outdata[len_samples:] = bytes(len(outdata)-len_samples)
         else:
-            outdata[:] = b'\0' * len(outdata)
+            outdata[:] = bytes(len(outdata))
 
     def _poll_among_us(self):
         if not self.among_us_memory.open_process():

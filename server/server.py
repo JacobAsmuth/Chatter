@@ -102,7 +102,7 @@ class Server:
                             client.send_voice(final_audio)
                         except Exception as e:
                             print("Error sending final audio: " + str(e))
-            sleep(consts.OUTPUT_BLOCK_TIME)
+            sleep(consts.OUTPUT_BLOCK_TIME * 0.9)
 
     def receive_voice_loop(self):
         while not self.closing:

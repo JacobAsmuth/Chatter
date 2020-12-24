@@ -18,7 +18,7 @@ class AudioEngineBase(abc.ABC):
         lp_dead = lp.dead
         lp_in_vent = lp.inVent
         haunting_ratio = settings.haunting_ratio
-        is_imposter = lp.impostor
+        lp_is_imposter = lp.impostor
 
         if memory_read.game_state == memory.GameState.DISCUSSION:
             for p in memory_read.players:
@@ -32,7 +32,7 @@ class AudioEngineBase(abc.ABC):
                 both_in_vent = lp_in_vent and p.inVent
                 gain = both_in_vent + ((not both_in_vent) * gain) # 1 if both in vent, 'gain' otherwise
 
-                hauntable = is_imposter and p.dead and haunting_ratio > 0
+                hauntable = lp_is_imposter and p.dead and haunting_ratio > 0
                 
                 # If hauntable, then gain = gain * haunting ratio
                 # If not hauntable, then gain = gain
