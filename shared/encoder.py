@@ -15,7 +15,13 @@ class Encoder:
         self._decoder.set_sampling_frequency(consts.SAMPLE_RATE)
 
     def decode(self, frame: bytes) -> bytes:
-        return self._decoder.decode(frame)
+        try:
+            return self._decoder.decode(bytearray(frame))
+        except Exception as e:
+            print("Decode error: ", str(e))
 
     def encode(self, frame: bytes) -> bytes:
-        return self._encoder.encode(frame).tobytes()
+        try:
+            return self._encoder.encode(frame).tobytes()
+        except Exception as e:
+            print("Encode error: ", str(e))

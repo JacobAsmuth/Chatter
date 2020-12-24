@@ -204,6 +204,7 @@ class Server:
 
     def toggle_ignore_gain_command(self, _):
         self.settings.ignore_client_gain = not self.settings.ignore_client_gain
+        print("Ignore gain set to %s" % (self.settings.ignore_client_gain))
         self.save_settings()
 
     def wait_for_commands(self):
