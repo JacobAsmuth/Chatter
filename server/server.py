@@ -124,7 +124,6 @@ class Server:
             if type(client_packet) != packets.ClientPacket:
                 raise Exception("Invalid packet type: %s" % (type(client_packet)))
 
-
             with self.clients_lock:
                 tcp_data_socket.sendall(consts.ACK_MSG)
 

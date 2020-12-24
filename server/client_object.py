@@ -1,6 +1,7 @@
 import shared.consts as consts
 import shared.packets as packets
 from shared.jitter_buffer import JitterBuffer
+from shared.encoder import Encoder
 
 from typing import Union
 from time import time
@@ -34,6 +35,7 @@ class ClientObject:
         }
         self.last_updated = time()
         self.volume = 1.0
+        self.encoder = Encoder()
 
         threading.Thread(target=self.receive_tcp_data, daemon=True).start()
 
@@ -55,8 +57,8 @@ class ClientObject:
                     self.close()
 
     def send_voice(self, frame) -> None:
-        encoded_audio, self.encoding_state = audioop.lin2adpcm(frame, consts.BYTES_PER_SAMPLE, self.encoding_state)
-        packet = packets.ServerVoiceFramePacket(time(), encoded_audio)
+        #encoded_audio, self.encoding_state = audioop.lin2adpcm(frame, consts.BYTES_PER_SAMPLE, self.encoding_state)
+        packet = packets.ServerVoiceFramePacket(time(), self.encoder.encode(frame))
         packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
         self.voice_socket.sendto(packet_bytes, self.voice_address)
 
@@ -66,8 +68,8 @@ class ClientObject:
 
     def add_voice_frame(self, packet: packets.ClientVoiceFramePacket) -> None:
         self.last_updated = time()
-        decoded_audio, self.decoding_state = audioop.adpcm2lin(packet.voiceFrame, consts.BYTES_PER_SAMPLE, self.decoding_state)
-        self.voice_buffer.add_frame(packet.frameId, decoded_audio)
+        #decoded_audio, self.decoding_state = audioop.adpcm2lin(packet.voiceFrame, consts.BYTES_PER_SAMPLE, self.decoding_state)
+        self.voice_buffer.add_frame(packet.frameId, self.encoder.decode(packet.voiceFrame))
 
     def read_voice_frame(self) -> Union[bytes, None]:
         return self.voice_buffer.get_samples()
