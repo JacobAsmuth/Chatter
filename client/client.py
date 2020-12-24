@@ -222,7 +222,7 @@ class Client:
         while not self.exiting:
             try:
                 self.read_memory_and_send()
-                sleep(consts.OUTPUT_BLOCK_TIME)
+                sleep(0.05)
             except Exception as e:
                 print("Error in memory loop: %s" % (e,))
                 sleep(5)
