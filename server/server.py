@@ -108,6 +108,7 @@ class Server:
         while not self.closing:
             try:
                 raw_bytes, address = self.voice_socket.recvfrom(consts.PACKET_SIZE)
+                print("Received %d bytes" % (len(raw_bytes),))
                 packet: packets.ClientVoiceFramePacket = pickle.loads(raw_bytes)
                 client = self.get_client_object(packet.clientId, voice_address=address)
                 client.add_voice_frame(packet)
