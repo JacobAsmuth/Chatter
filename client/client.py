@@ -32,7 +32,7 @@ class Client:
         self.encoder = None
         self.sent_frames_count = 0
         self.release_frame = -1
-        self.release_frame_duration = 2
+        self.release_frame_duration = 3
 
         self.muted = False
         self.voice_socket = None
@@ -174,8 +174,10 @@ class Client:
 
     def audio_callback(self, indata, outdata, frames: int, time_, status):
         rms = audioop.rms(indata, consts.BYTES_PER_SAMPLE)
-        if rms < 150 or self.sent_frames_count <= self.release_frame:
+        if rms < 200:
             audio = bytes(len(indata))
+        elif self.sent_frames_count <= self.release_frame:
+            audio = bytes(indata)
         else:
             self.release_frame = self.sent_frames_count + self.release_frame_duration
             audio = bytes(indata)
