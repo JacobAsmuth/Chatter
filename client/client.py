@@ -1,5 +1,5 @@
 from shared.encoder import Encoder
-import sounddevice
+import sounddevice, soundcard, pydub
 import socket
 import threading
 import pickle
@@ -58,10 +58,15 @@ class Client:
         self.data_port = data_port
         self.sent_audio = False
         self.encoder = Encoder()
+        self.all_audio = bytearray()
         self.voice_buffer = JitterBuffer(consts.MIN_BUFFER_SIZE, consts.MAX_BUFFER_SIZE)
 
-        self.recording_stream = sounddevice.RawInputStream(blocksize=consts.SAMPLES_PER_FRAME, channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16, callback=self.read_audio_callback)
-        self.playing_stream = sounddevice.RawOutputStream(blocksize=consts.SAMPLES_PER_FRAME, channels=consts.CHANNELS, samplerate=consts.SAMPLE_RATE, dtype=np.int16, callback=self.play_audio_callback)
+        self.audio_stream = sounddevice.RawStream(blocksize=consts.SAMPLES_PER_FRAME,
+                                                    channels=consts.CHANNELS,
+                                                    samplerate=consts.SAMPLE_RATE,
+                                                    dtype=np.int16,
+                                                    callback=self.audio_callback,
+                                                )
 
         self.voice_addr = (self.ip, self.voice_port)
         self.data_addr = (self.ip, self.data_port)
@@ -73,11 +78,10 @@ class Client:
 
         _ = self.tcp_data_socket.recv(len(consts.ACK_MSG))
 
-        self.recording_stream.start()
-        self.playing_stream.start()
+        self.audio_stream.start()
+
         print("Connected to server, initializing...") 
         threading.Thread(target=self.receive_audio_loop, daemon=True).start()
-
         threading.Thread(target=self.read_memory_loop, daemon=True).start()
         threading.Thread(target=self.receive_tcp_data_loop, daemon=True).start()
 
@@ -164,7 +168,7 @@ class Client:
             try:
                 raw_bytes, _ = self.voice_socket.recvfrom(consts.PACKET_SIZE)
                 packet: packets.ServerVoiceFramePacket = pickle.loads(raw_bytes)
-                self.voice_buffer.add_frame(packet.frameId, self.encoder.decode(packet.voiceFrame))
+                self.voice_buffer.add_frame(packet.frameId, packet.voiceFrame)
             except WindowsError as e:
                 if not self.exiting:
                     self.close()
@@ -176,20 +180,31 @@ class Client:
                     print("Error receiving audio: " + str(e))
                 break
 
-    def read_audio_callback(self, indata, frames: int, time_, status_):
+    def audio_callback(self, indata, outdata, frames: int, time_, status):
         packet = packets.ClientVoiceFramePacket(frameId=time(), clientId=self.client_id, voiceFrame=self.encoder.encode(bytes(indata)))
         packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
-        self.voice_socket.sendto(packet_bytes, self.voice_addr)
+        if not self.exiting:
+            self.voice_socket.sendto(packet_bytes, self.voice_addr)
+
         self.sent_audio = True
 
-    def play_audio_callback(self, outdata, frames: int, time_, status):
         samples = self.voice_buffer.get_samples()
-        if samples is not None and not self.muted:
-            len_samples = len(samples)
-            outdata[:len_samples] = samples
-            outdata[len_samples:] = bytes(len(outdata)-len_samples)
+        if samples is not None and self.muted is False:
+            outdata[:] = self.encoder.decode(samples)
         else:
             outdata[:] = bytes(len(outdata))
+
+    def play_audio(self):
+        with self.default_speaker.player(consts.SAMPLE_RATE) as player:
+            while True:
+                try:
+                    samples = self.voice_buffer.get_samples()
+                    if samples is not None and not self.muted:
+                        self.all_audio += samples
+                        np_samples = np.frombuffer(samples, dtype=np.int16).astype(np.float32, order='C') / 32768.0
+                        player.play(np_samples)
+                except Exception as e:
+                    print("Error playing audio: %s" %  (e,))
 
     def _poll_among_us(self):
         if not self.among_us_memory.open_process():
@@ -236,6 +251,14 @@ class Client:
             print('Unknown command :(')
 
     def exit_command(self, _):
+        '''
+        import wave
+        with wave.open('output.wav', mode='wb') as f:
+            f.setnchannels(consts.CHANNELS)
+            f.setsampwidth(consts.BYTES_PER_SAMPLE)
+            f.setframerate(consts.SAMPLE_RATE)
+            f.writeframes(self.all_audio)
+        '''
         self.close()
         exit()
 

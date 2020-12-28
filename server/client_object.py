@@ -21,8 +21,6 @@ class ClientObject:
         self.udp_data_socket = udp_data_socket
         self.voice_socket = voice_socket
         self.client_id = client_id
-        self.encoding_state = None
-        self.decoding_state = None
         self.offsets = offsets
         self.closing = False
         self.player_name = None  # AmongUs In-game name
@@ -57,7 +55,6 @@ class ClientObject:
                     self.close()
 
     def send_voice(self, frame) -> None:
-        #encoded_audio, self.encoding_state = audioop.lin2adpcm(frame, consts.BYTES_PER_SAMPLE, self.encoding_state)
         packet = packets.ServerVoiceFramePacket(time(), self.encoder.encode(frame))
         packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
         self.voice_socket.sendto(packet_bytes, self.voice_address)
@@ -68,11 +65,13 @@ class ClientObject:
 
     def add_voice_frame(self, packet: packets.ClientVoiceFramePacket) -> None:
         self.last_updated = time()
-        #decoded_audio, self.decoding_state = audioop.adpcm2lin(packet.voiceFrame, consts.BYTES_PER_SAMPLE, self.decoding_state)
-        self.voice_buffer.add_frame(packet.frameId, self.encoder.decode(packet.voiceFrame))
+        self.voice_buffer.add_frame(packet.frameId, packet.voiceFrame)
 
     def read_voice_frame(self) -> Union[bytes, None]:
-        return self.voice_buffer.get_samples()
+        samples = self.voice_buffer.get_samples()
+        if samples is None:
+            return None
+        return self.encoder.decode(samples)
 
     def handle_packet(self, packet) -> None:
         packet_type = type(packet)

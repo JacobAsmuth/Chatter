@@ -16,7 +16,7 @@ class Encoder:
 
     def decode(self, frame: bytes) -> bytes:
         try:
-            return self._decoder.decode(bytearray(frame))
+            return self._decoder.decode(bytearray(frame)).tobytes()
         except Exception as e:
             print("Decode error: ", str(e))
 
