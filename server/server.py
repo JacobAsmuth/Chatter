@@ -103,8 +103,6 @@ class Server:
                         except Exception as e:
                             print("Error sending final audio: " + str(e))
             end = time()
-            print("loop took %f seconds" % (end-start,))
-            end = time()
             sleep(consts.FRAME_DURATION - (end-start))
 
     def receive_voice_loop(self):
