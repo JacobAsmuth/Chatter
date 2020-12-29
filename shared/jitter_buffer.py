@@ -20,9 +20,6 @@ class JitterBuffer(object):
             return None
 
         frame = self.frames.popleft()
-        if self.last_frame_time is not None:
-            print("Delta: %f" % (frame.frameId-self.last_frame_time,))
-        self.last_frame_time = frame.frameId
         return frame.samples
 
     def add_frame(self, frame_id: float, samples: bytes) -> None:
