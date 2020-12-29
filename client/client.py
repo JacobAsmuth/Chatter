@@ -113,7 +113,7 @@ class Client:
             
     def wait_for_commands(self):
         print("Type help for available commands.")
-        while True:
+        while not self.closing:
             try:
                 cmd = input("$ ")
             except KeyboardInterrupt:
