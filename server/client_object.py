@@ -25,7 +25,7 @@ class ClientObject:
         self.closing = False
         self.player_name = None  # AmongUs In-game name
         self.voice_buffer = JitterBuffer(consts.MIN_BUFFER_SIZE, consts.MAX_BUFFER_SIZE)
-        self.audio_levels_map = collections.defaultdict(float)
+        self.audio_levels_map = collections.defaultdict(lambda: (0, 1))
         self.packet_handlers = {
             packets.AudioLevelsPacket: self.audio_levels_packet_handler,
             packets.VolumePacket: self.volume_packet_handler,
