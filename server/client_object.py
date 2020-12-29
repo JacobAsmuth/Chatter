@@ -8,7 +8,6 @@ from time import time
 import collections
 import socket
 import pickle
-import audioop
 import threading
 
 class ClientObject:

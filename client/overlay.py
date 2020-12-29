@@ -1,4 +1,6 @@
-import pygame
+import contextlib
+with contextlib.redirect_stdout(None):
+    import pygame
 import win32gui, win32api, win32con
 from time import sleep
 from threading import Thread
@@ -50,9 +52,11 @@ class OverlayUi(Thread):
                     to_blit = []
                     if self.client.imposter_chat:
                         to_blit.append(text_renderer.render("IMPOSTER ONLY", False, (255, 0, 0)))
+                    if self.client.muted:
+                        to_blit.append(text_renderer.render("MUTED", False, (0, 10, 200)))
 
                     for i, blittable in enumerate(to_blit):
-                        self.overlay.blit(blittable, (w/2, 45+(i*font_size)))
+                        self.overlay.blit(blittable, (w/2, 30+(i*font_size)))
 
                 self.reset_overlay(x, y)
                 pygame.display.flip()

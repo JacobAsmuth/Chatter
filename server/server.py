@@ -29,7 +29,8 @@ class Server:
             'exit': self.exit_command,
             'help': self.help_command,
             'clients': self.clients_command,
-            'update': self.update_settings_command,
+            'clientsettings': self.list_client_settings_command,
+            'setclientsetting': self.set_client_setting_command,
             'mixer': self.change_audio_mixer_command,
             'ignoregain': self.toggle_ignore_gain_command,
         }
@@ -38,6 +39,7 @@ class Server:
             self.offsets = yaml.load(f, Loader=yaml.FullLoader)
         self.settings_filepath = consts.SERVER_SETTINGS_FILE
         self.settings = self._try_load_settings()
+        self.client_settings = packets.AllSettingsPacket()
 
     def setup_voice(self, port):
         self.voice_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -132,7 +134,9 @@ class Server:
                                         self.voice_socket,
                                         self.get_next_join_id())
                 print("Received new client: %d" % (client.join_id,))
+
                 client.send(packets.OffsetsPacket(self.offsets))
+                client.send(self.client_settings)
 
                 self.clients[client_packet.clientId] = client
         except Exception as e:
@@ -191,9 +195,25 @@ class Server:
         for client in self.clients:
             print(client)
 
-    def update_settings_command(self, _):
+    def list_client_settings_command(self, _):
+        for key in self.client_settings.__dataclass_fields__:
+            print(key)
+
+    def set_client_settings_command(self, args):
+        client_settings = self.client_settings.__dataclass_fields__
+        if args[0] not in client_settings:
+            print("Not a valid setting. Try running 'listclientsettings'.")
+            return
+
+        try:
+            new_value = eval(' '.join(args[1:]))
+        except Exception as e:
+            print("Unable to parse new value: %s" % (e,))
+            return
+
+        packet = packets.SettingPacket(key=args[0], value=new_value)
         for client in self.clients.values():
-            client.send_data(packets.ClientSettingsPacket(1, 2, 3))
+            client.send(packet)
 
     def change_audio_mixer_command(self, args):
         mixer_map = {

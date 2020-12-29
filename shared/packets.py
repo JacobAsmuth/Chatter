@@ -31,12 +31,17 @@ class OffsetsPacket:
     offsets: Any
 
 @dataclass
-class ClientSettingsPacket:
+class AllSettingsPacket:
     voice_distance: float = 3
     wall_attenuation: float = 1
     lowest_hearable_volume: float = 0.2
     haunting_ratio: float = 0.5
     imposter_voice_allowed: bool = True
+
+@dataclass
+class SettingPacket:
+    key: str
+    value: Any
 
 @dataclass
 class ServerRestartingPacket:

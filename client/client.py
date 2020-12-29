@@ -28,7 +28,7 @@ class Client:
         self.voice_port = None
         self.data_port = None
         self.client_id = random.getrandbits(64)
-        self.settings = packets.ClientSettingsPacket()
+        self.settings = packets.SettingPacket()
         self.send_data_lock = Lock()
         self.voice_buffer = None
         self.encoder = None
@@ -39,6 +39,7 @@ class Client:
         self.imposter_chat = False
 
         keyboard.hook_key("shift", self.on_shift)
+        keyboard.hook_key("right ctrl", self.on_right_ctrl)
 
         self.muted = False
         self.voice_socket = None
@@ -53,7 +54,7 @@ class Client:
         }
 
         self.packet_handlers = {
-            packets.ClientSettingsPacket: self.client_settings_packet_handler,
+            packets.SettingPacket: self.setting_packet_handler,
             packets.ServerRestartingPacket: self.retry_command,
         }
 
@@ -84,10 +85,9 @@ class Client:
         self.tcp_data_socket.connect(self.data_addr)
         self.tcp_data_socket.sendall(pickle.dumps(packets.ClientPacket(self.client_id), consts.PICKLE_PROTOCOL))
 
-        offsets_packet = pickle.loads(self.tcp_data_socket.recv(consts.PACKET_SIZE))
-        assert type(offsets_packet) == packets.OffsetsPacket
+        self.receive_offsets()
+        self.receive_settings()
 
-        self.among_us_memory.set_offsets(offsets_packet.offsets)
         self.audio_stream.start()
 
         # beep beep
@@ -219,6 +219,7 @@ class Client:
 
     def read_memory_and_send(self):
         memory_read = self.among_us_memory.read()
+        self.last_memory_read = memory_read
         if memory_read.local_player:
             names, gains = self.audio_engine.get_audio_levels(memory_read, self.settings)
 
@@ -226,7 +227,6 @@ class Client:
                                                 playerName=memory_read.local_player.name,
                                                 playerNames=names,
                                                 gains=gains), tcp=False)
-        self.last_memory_read = memory_read
 
     def read_memory_loop(self):
         self._poll_among_us()
@@ -266,12 +266,10 @@ class Client:
 
     def mute_command(self, _):
         self.muted = not self.muted
-
-    def client_settings_packet_handler(self, packet: packets.ClientSettingsPacket):
-        for field in packet.__dataclass_fields__:
-             val = getattr(packet, field)
-             if val is not None:
-                 setattr(self.settings, field, val)
+        if self.muted:
+            print("Audio is muted")
+        else:
+            print("Audio unmuted")
 
     def on_shift(self, e):
         if e.event_type == keyboard.KEY_DOWN:
@@ -282,3 +280,32 @@ class Client:
                 self.imposter_chat = True
         else:  # key up
             self.imposter_chat = False
+
+    def on_right_ctrl(self, e):
+        if e.event_type == keyboard.KEY_DOWN:
+            if self.muted:
+                winsound.Beep(500, 100)
+                self.muted = False
+            else:
+                self.muted = True
+                winsound.Beep(380, 100)
+    
+    def receive_offsets(self):
+        offsets_packet = pickle.loads(self.tcp_data_socket.recv(consts.PACKET_SIZE))
+        assert type(offsets_packet) == packets.OffsetsPacket
+
+        self.among_us_memory.set_offsets(offsets_packet.offsets)
+
+    def receive_settings(self):
+        settings_packet = pickle.loads(self.tcp_data_socket.recv(consts.PACKET_SIZE))
+        assert type(settings_packet) == packets.AllSettingsPacket
+
+        self.settings = settings_packet
+
+    def setting_packet_handler(self, packet: packets.SettingPacket):
+        if hasattr(self.settings, packet.key):
+            setattr(self.settings, packet.key, packet.value)
+            print("Server set your %s setting to %d!" % (packet.key, packet.value))
+        else:
+            print("Server sent invalid setting: %s" % (packet.key,))
+        

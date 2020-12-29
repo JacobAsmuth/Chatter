@@ -33,7 +33,7 @@ class ArrayMixer(AudioMixerBase):
         
         return audioop.mul(final_sample, consts.BYTES_PER_SAMPLE, destination_client.volume * len(frames))
 
-    @staticmethod 
+    @staticmethod
     def get_frames_and_gains(destination_client: ClientObject, all_voice_frames: dict, settings: Settings):
         frames = []
         gains = []
@@ -44,8 +44,8 @@ class ArrayMixer(AudioMixerBase):
                 continue
 
             gain, _ = audio_levels_map[source_client.player_name]
-            _, can_hear_me = source_client.audio_levels_map[destination_client.player_name]
-            gain = (ignore_client_gain + ((not ignore_client_gain) * gain)) * can_hear_me
+            _, destination_can_hear_source = source_client.audio_levels_map[destination_client.player_name]
+            gain = (ignore_client_gain + ((not ignore_client_gain) * gain)) * destination_can_hear_source
 
             if gain > 0:
                 frames.append(voice_frame)
