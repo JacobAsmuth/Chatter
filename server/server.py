@@ -124,8 +124,6 @@ class Server:
                 raise Exception("Invalid packet type: %s" % (type(client_packet)))
 
             with self.clients_lock:
-                tcp_data_socket.sendall(consts.ACK_MSG)
-
                 client = ClientObject(client_packet.clientId,
                                         self.offsets,
                                         tcp_data_socket,
@@ -133,6 +131,8 @@ class Server:
                                         self.voice_socket,
                                         self.get_next_join_id())
                 print("Received new client: %d" % (client.join_id,))
+                client.send(packets.OffsetsPacket(self.offsets))
+
                 self.clients[client_packet.clientId] = client
         except Exception as e:
             print("Failed to accept new client: %s" % (e,))

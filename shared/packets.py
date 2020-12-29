@@ -26,11 +26,7 @@ class VolumePacket:
     volume: float
 
 @dataclass
-class OffsetsRequestPacket:
-    pass
-
-@dataclass
-class OffsetsResponsePacket:
+class OffsetsPacket:
     offsets: Any
 
 @dataclass

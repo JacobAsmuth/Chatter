@@ -28,7 +28,6 @@ class ClientObject:
         self.audio_levels_map = collections.defaultdict(float)
         self.packet_handlers = {
             packets.AudioLevelsPacket: self.audio_levels_packet_handler,
-            packets.OffsetsRequestPacket: self.offsets_request_packet_handler,
             packets.VolumePacket: self.volume_packet_handler,
         }
         self.last_updated = time()
@@ -84,9 +83,6 @@ class ClientObject:
         self.player_name = packet.playerName
         for player_name, gain in zip(packet.playerNames, packet.gains):
             self.audio_levels_map[player_name] = gain
-
-    def offsets_request_packet_handler(self, _: packets.OffsetsRequestPacket) -> None:
-        self.send(packets.OffsetsResponsePacket(self.offsets))
 
     def volume_packet_handler(self, packet: packets.VolumePacket) -> None:
         self.volume = packet.volume

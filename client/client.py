@@ -9,6 +9,7 @@ import numpy as np
 import random
 from sys import exit
 from threading import Lock
+import winsound
 
 import shared.consts as consts
 import shared.packets as packets
@@ -48,12 +49,13 @@ class Client:
 
         self.packet_handlers = {
             packets.ClientSettingsPacket: self.client_settings_packet_handler,
-            packets.OffsetsResponsePacket: self.offsets_response_packet_handler,
             packets.ServerRestartingPacket: self.retry_command,
         }
 
     def connect(self, ip, voice_port, data_port):
         self.closing = False
+        self.sent_frames_count = 0
+        self.release_frame = -1
         self.ip = ip
         self.voice_port = voice_port
         self.data_port = data_port
@@ -77,9 +79,17 @@ class Client:
         self.tcp_data_socket.connect(self.data_addr)
         self.tcp_data_socket.sendall(pickle.dumps(packets.ClientPacket(self.client_id), consts.PICKLE_PROTOCOL))
 
-        _ = self.tcp_data_socket.recv(len(consts.ACK_MSG))
+        offsets_packet = pickle.loads(self.tcp_data_socket.recv(consts.PACKET_SIZE))
+        assert type(offsets_packet) == packets.OffsetsPacket
 
+        self.among_us_memory.set_offsets(offsets_packet.offsets)
         self.audio_stream.start()
+
+        # beep beep
+        winsound.Beep(300, 80)
+        winsound.Beep(350, 90)
+        winsound.Beep(400, 200)
+        winsound.Beep(500, 200)
 
         print("Connected to server, initializing...") 
         threading.Thread(target=self.receive_audio_loop, daemon=True).start()
@@ -179,8 +189,8 @@ class Client:
         elif self.sent_frames_count <= self.release_frame:
             audio = bytes(indata)
         else:
-            self.release_frame = self.sent_frames_count + self.release_frame_duration
             audio = bytes(indata)
+            self.release_frame = self.sent_frames_count + self.release_frame_duration
 
         packet = packets.ClientVoiceFramePacket(frameId=time(), clientId=self.client_id, voiceFrame=self.encoder.encode(audio))
         packet_bytes = pickle.dumps(packet, protocol=consts.PICKLE_PROTOCOL)
@@ -202,12 +212,6 @@ class Client:
 
         print("Found Among Us.exe!")       
 
-    def _get_offsets(self):
-        print("Asking for offsets from server...")
-        self.send(packets.OffsetsRequestPacket())
-        while not self.among_us_memory.has_offsets():
-            sleep(0.1)
-
     def read_memory_and_send(self):
         memory_read = self.among_us_memory.read()
         if memory_read.local_player:
@@ -219,7 +223,6 @@ class Client:
                                                 gains=gains), tcp=False)
 
     def read_memory_loop(self):
-        self._get_offsets()
         self._poll_among_us()
 
         while not self.closing:
@@ -272,6 +275,3 @@ class Client:
              val = getattr(packet, field)
              if val is not None:
                  setattr(self.settings, field, val)
-
-    def offsets_response_packet_handler(self, packet: packets.OffsetsResponsePacket):
-        self.among_us_memory.set_offsets(packet.offsets)
