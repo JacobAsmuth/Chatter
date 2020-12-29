@@ -196,12 +196,12 @@ class Server:
             print(client)
 
     def list_client_settings_command(self, _):
-        for key in self.client_settings.__dataclass_fields__:
-            print(key)
+        map(print, self.client_settings.__dataclass_fields__)
 
     def set_client_setting_command(self, args):
         client_settings = self.client_settings.__dataclass_fields__
-        if args[0] not in client_settings:
+        key = args[0]
+        if key not in client_settings:
             print("Not a valid setting. Try running 'listclientsettings'.")
             return
 
@@ -211,7 +211,8 @@ class Server:
             print("Unable to parse new value: %s" % (e,))
             return
 
-        packet = packets.SettingPacket(key=args[0], value=new_value)
+        setattr(self.client_settings, key, new_value)
+        packet = packets.SettingPacket(key=key, value=new_value)
         for client in self.clients.values():
             client.send(packet)
 

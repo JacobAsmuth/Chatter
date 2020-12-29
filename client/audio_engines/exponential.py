@@ -7,7 +7,7 @@ import shared.packets as packets
 
 class Exponential(base.AudioEngineBase):
     @staticmethod
-    def get_audio_levels(memory_read: memory.MemoryRead, settings: packets.ClientSettingsPacket) -> tuple[List[int], List[int]]:
+    def get_audio_levels(memory_read: memory.MemoryRead, settings: packets.AllSettingsPacket) -> tuple[List[int], List[int]]:
         lp = memory_read.local_player
         if lp is None:
             return [], []

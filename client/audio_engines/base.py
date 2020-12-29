@@ -6,9 +6,9 @@ import shared.packets as packets
 
 class AudioEngineBase(abc.ABC):
     @abc.abstractmethod
-    def calculate_falloff(self, local_player: memory.Player, other_player: memory.Player, settings: packets.ClientSettingsPacket) -> float: ...
+    def calculate_falloff(self, local_player: memory.Player, other_player: memory.Player, settings: packets.AllSettingsPacket) -> float: ...
 
-    def get_audio_levels(self, memory_read: memory.MemoryRead, settings: packets.ClientSettingsPacket, imposter_voice: bool) -> tuple[List[str], List[float], List[bool]]:
+    def get_audio_levels(self, memory_read: memory.MemoryRead, settings: packets.AllSettingsPacket, imposter_voice: bool) -> tuple[List[str], List[float], List[bool]]:
         lp = memory_read.local_player
         if lp is None:
             return [], [], []

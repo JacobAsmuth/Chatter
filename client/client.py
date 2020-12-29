@@ -28,7 +28,7 @@ class Client:
         self.voice_port = None
         self.data_port = None
         self.client_id = random.getrandbits(64)
-        self.settings = packets.SettingPacket()
+        self.settings = packets.AllSettingsPacket()
         self.send_data_lock = Lock()
         self.voice_buffer = None
         self.encoder = None
@@ -305,7 +305,7 @@ class Client:
     def setting_packet_handler(self, packet: packets.SettingPacket):
         if hasattr(self.settings, packet.key):
             setattr(self.settings, packet.key, packet.value)
-            print("Server set your %s setting to %d!" % (packet.key, packet.value))
+            print("Server set your %s setting to %s!" % (packet.key, packet.value))
         else:
             print("Server sent invalid setting: %s" % (packet.key,))
         
