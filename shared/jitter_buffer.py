@@ -11,6 +11,7 @@ class JitterBuffer(object):
     def __init__(self, min_frame_count: int, max_frame_count: int) -> None:
         self.min_frame_count = min_frame_count
         self.max_frame_count = max_frame_count
+        self.last_frame_time = None
 
         self.frames = deque()
 
@@ -18,7 +19,11 @@ class JitterBuffer(object):
         if len(self.frames) < self.min_frame_count:
             return None
 
-        return self.frames.popleft().samples
+        frame = self.frames.popleft()
+        if self.last_frame_time is not None:
+            print("Delta: %f" % (frame.frameId-self.last_frame_time,))
+        self.last_frame_time = frame.frameId
+        return frame.samples
 
     def add_frame(self, frame_id: float, samples: bytes) -> None:
         insert_index = len(self.frames)

@@ -72,12 +72,12 @@ class Server:
 
     def send_voice_loop(self):
         while not self.closing:
+            start = time()
             to_remove = []
             voice_frames = {}
-            cur_time = time()
             with self.clients_lock:
                 for client in self.clients.values():
-                    if cur_time - client.last_updated > consts.CLEANUP_TIMEOUT:
+                    if start - client.last_updated > consts.CLEANUP_TIMEOUT:
                         to_remove.append(client)
                         continue
                     client_voice_frame = client.read_voice_frame()
@@ -102,7 +102,10 @@ class Server:
                             client.send_voice(final_audio)
                         except Exception as e:
                             print("Error sending final audio: " + str(e))
-            sleep(consts.FRAME_DURATION * 0.9)
+            end = time()
+            print("loop took %f seconds" % (end-start))
+            end = time()
+            sleep(consts.FRAME_DURATION - end-start)
 
     def receive_voice_loop(self):
         while not self.closing:
