@@ -10,12 +10,13 @@ import random
 from sys import exit
 from threading import Lock
 import winsound
+import keyboard
 
 import shared.consts as consts
 import shared.packets as packets
 from shared.jitter_buffer import JitterBuffer
 from shared.encoder import Encoder
-from client.memory import AmongUsMemory
+from client.memory import AmongUsMemory, MemoryRead
 from client.audio_engines.base import AudioEngineBase
 
 class Client:
@@ -34,6 +35,10 @@ class Client:
         self.sent_frames_count = 0
         self.release_frame = -1
         self.release_frame_duration = 3
+        self.last_memory_read: MemoryRead = None
+        self.imposter_chat = False
+
+        keyboard.hook_key("shift", self.on_shift)
 
         self.muted = False
         self.voice_socket = None
@@ -221,6 +226,7 @@ class Client:
                                                 playerName=memory_read.local_player.name,
                                                 playerNames=names,
                                                 gains=gains), tcp=False)
+        self.last_memory_read = memory_read
 
     def read_memory_loop(self):
         self._poll_among_us()
@@ -229,8 +235,7 @@ class Client:
             try:
                 self.read_memory_and_send()
                 sleep(0.05)
-            except Exception as e:
-                print("Error in memory loop: %s" % (e,))
+            except Exception:
                 sleep(5)
                 self._poll_among_us()
             
@@ -242,14 +247,6 @@ class Client:
             print('Unknown command :(')
 
     def exit_command(self, _):
-        '''
-        import wave
-        with wave.open('output.wav', mode='wb') as f:
-            f.setnchannels(consts.CHANNELS)
-            f.setsampwidth(consts.BYTES_PER_SAMPLE)
-            f.setframerate(consts.SAMPLE_RATE)
-            f.writeframes(self.all_audio)
-        '''
         self.close()
         exit()
 
@@ -275,3 +272,13 @@ class Client:
              val = getattr(packet, field)
              if val is not None:
                  setattr(self.settings, field, val)
+
+    def on_shift(self, e):
+        if e.event_type == keyboard.KEY_DOWN:
+            if self.last_memory_read \
+              and self.last_memory_read.local_player \
+              and self.last_memory_read.local_player.impostor \
+              and self.settings.imposter_voice_allowed:
+                self.imposter_chat = True
+        else:  # key up
+            self.imposter_chat = False

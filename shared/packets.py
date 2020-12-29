@@ -20,6 +20,7 @@ class AudioLevelsPacket(ClientPacket):
     playerName: str
     playerNames: List[str]
     gains: List[float]
+    canHearMe: List[bool]
 
 @dataclass
 class VolumePacket:
@@ -35,6 +36,7 @@ class ClientSettingsPacket:
     wall_attenuation: float = 1
     lowest_hearable_volume: float = 0.2
     haunting_ratio: float = 0.5
+    imposter_voice_allowed: bool = True
 
 @dataclass
 class ServerRestartingPacket:
