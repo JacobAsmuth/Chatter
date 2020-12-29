@@ -199,7 +199,7 @@ class Server:
         for key in self.client_settings.__dataclass_fields__:
             print(key)
 
-    def set_client_settings_command(self, args):
+    def set_client_setting_command(self, args):
         client_settings = self.client_settings.__dataclass_fields__
         if args[0] not in client_settings:
             print("Not a valid setting. Try running 'listclientsettings'.")
