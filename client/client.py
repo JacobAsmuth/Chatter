@@ -16,7 +16,7 @@ import shared.consts as consts
 import shared.packets as packets
 from shared.jitter_buffer import JitterBuffer
 from shared.encoder import Encoder
-from client.memory import AmongUsMemory, MemoryRead
+from client.memory import AmongUsMemory, MemoryRead, GameState
 from client.audio_engines.base import AudioEngineBase
 
 class Client:
@@ -39,7 +39,7 @@ class Client:
         self.imposter_chat = False
 
         keyboard.hook_key("shift", self.on_shift)
-        keyboard.hook_key("right ctrl", self.on_right_ctrl)
+        keyboard.on_press_key(29, self.on_right_ctrl)
 
         self.muted = False
         self.voice_socket = None
@@ -276,12 +276,16 @@ class Client:
             if self.last_memory_read \
               and self.last_memory_read.local_player \
               and self.last_memory_read.local_player.impostor \
-              and self.settings.imposter_voice_allowed:
+              and self.settings.imposter_voice_allowed \
+              and (self.settings.imposter_voice_during_discussion or self.last_memory_read.game_state != GameState.DISCUSSION):
                 self.imposter_chat = True
         else:  # key up
             self.imposter_chat = False
 
     def on_right_ctrl(self, e):
+        if e.name != "right ctrl":
+            return
+
         if e.event_type == keyboard.KEY_DOWN:
             if self.muted:
                 winsound.Beep(500, 100)

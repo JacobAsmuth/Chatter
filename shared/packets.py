@@ -37,6 +37,7 @@ class AllSettingsPacket:
     lowest_hearable_volume: float = 0.2
     haunting_ratio: float = 0.5
     imposter_voice_allowed: bool = True
+    imposter_voice_during_discussion: bool = True
 
 @dataclass
 class SettingPacket:
@@ -45,4 +46,4 @@ class SettingPacket:
 
 @dataclass
 class ServerRestartingPacket:
-    pass
+    pass 
