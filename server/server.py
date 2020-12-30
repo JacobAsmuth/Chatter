@@ -196,7 +196,8 @@ class Server:
             print(client)
 
     def list_client_settings_command(self, _):
-        map(print, self.client_settings.__dataclass_fields__)
+        for field in self.client_settings.__dataclass_fields__:
+            print(field)
 
     def set_client_setting_command(self, args):
         client_settings = self.client_settings.__dataclass_fields__

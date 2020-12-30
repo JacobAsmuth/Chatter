@@ -225,7 +225,6 @@ class Client:
         self.last_memory_read = memory_read
         if memory_read.local_player:
             names, gains, can_hear_me = self.audio_engine.get_audio_levels(memory_read, self.settings)
-
             self.send(packets.AudioLevelsPacket(clientId=self.client_id,
                                                 playerName=memory_read.local_player.name,
                                                 playerNames=names,
