@@ -37,6 +37,7 @@ class Client:
         self.release_frame_duration = 3
         self.last_memory_read: MemoryRead = None
         self.imposter_chat = False
+        self.noise_threshold = 200
 
         keyboard.hook_key("shift", self.on_shift)
         keyboard.on_press_key(29, self.on_right_ctrl)
@@ -51,6 +52,7 @@ class Client:
             'retry': self.retry_command,
             'volume': self.volume_command,
             'mute': self.mute_command,
+            'threshold': self.threshold_command,
         }
 
         self.packet_handlers = {
@@ -189,7 +191,7 @@ class Client:
 
     def audio_callback(self, indata, outdata, frames: int, time_, status):
         rms = audioop.rms(indata, consts.BYTES_PER_SAMPLE)
-        if rms < 200:
+        if rms < self.noise_threshold:
             audio = bytes(len(indata))
         elif self.sent_frames_count <= self.release_frame:
             audio = bytes(indata)
@@ -271,6 +273,12 @@ class Client:
         else:
             print("Audio unmuted")
 
+    def threshold_command(self, args):
+        try:
+            self.noise_threshold = int(args[0])
+        except:
+            print("Please enter a valid number, like this: 'threshhold 250'")
+    
     def on_shift(self, e):
         if e.event_type == keyboard.KEY_DOWN:
             if self.last_memory_read \
@@ -279,7 +287,10 @@ class Client:
               and self.settings.imposter_voice_allowed \
               and (self.settings.imposter_voice_during_discussion or self.last_memory_read.game_state != GameState.DISCUSSION):
                 self.imposter_chat = True
+                winsound.Beep(200, 100)
         else:  # key up
+            if self.imposter_chat:
+                winsound.Beep(200, 100)
             self.imposter_chat = False
 
     def on_right_ctrl(self, e):
