@@ -50,4 +50,5 @@ class ArrayMixer(AudioMixerBase):
             if gain > 0:
                 frames.append(voice_frame)
                 gains.append(gain)
+
         return frames, gains

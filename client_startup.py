@@ -21,7 +21,7 @@ def main(args):
         else:
             client.connect(args[0], consts.VOICE_PORT, consts.DATA_PORT)
 
-        OverlayUi(client, daemon=True).start()
+        #OverlayUi(client, daemon=True).start()
         client.wait_for_commands()
     except SystemExit:
         pass

@@ -8,7 +8,7 @@ class AudioEngineBase(abc.ABC):
     @abc.abstractmethod
     def calculate_falloff(self, local_player: memory.Player, other_player: memory.Player, settings: packets.AllSettingsPacket) -> float: ...
 
-    def get_audio_levels(self, memory_read: memory.MemoryRead, settings: packets.AllSettingsPacket, imposter_voice: bool) -> tuple[List[str], List[float], List[bool]]:
+    def get_audio_levels(self, memory_read: memory.MemoryRead, settings: packets.AllSettingsPacket) -> tuple[List[str], List[float], List[bool]]:
         lp = memory_read.local_player
         if lp is None:
             return [], [], []
@@ -20,6 +20,8 @@ class AudioEngineBase(abc.ABC):
         lp_in_vent = lp.inVent
         haunting_ratio = settings.haunting_ratio
         lp_is_imposter = lp.impostor
+        imposter_voice = settings.imposter_voice_allowed
+        imposter_voice_meetings = settings.imposter_voice_during_discussion
 
         if memory_read.game_state == memory.GameState.DISCUSSION:
             for p in memory_read.players:
@@ -27,7 +29,7 @@ class AudioEngineBase(abc.ABC):
 
                 player_names.append(p.name)
                 gains.append(gain)
-                canHearMe.append((not imposter_voice) or (imposter_voice and p.impostor))
+                canHearMe.append((not imposter_voice_meetings) or (imposter_voice_meetings and p.impostor))
         else:
             for p in memory_read.players:
                 gain = self.calculate_falloff(lp, p, settings)
@@ -42,6 +44,6 @@ class AudioEngineBase(abc.ABC):
 
                 player_names.append(p.name)
                 gains.append(gain)
-                canHearMe((not imposter_voice) or (imposter_voice and p.impostor))
+                canHearMe.append((not imposter_voice) or (imposter_voice and p.impostor))
 
         return player_names, gains, canHearMe

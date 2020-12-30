@@ -34,7 +34,7 @@ class Client:
         self.encoder = None
         self.sent_frames_count = 0
         self.release_frame = -1
-        self.release_frame_duration = 3
+        self.release_frame_duration = 10
         self.last_memory_read: MemoryRead = None
         self.imposter_chat = False
         self.noise_threshold = 200
@@ -53,6 +53,7 @@ class Client:
             'volume': self.volume_command,
             'mute': self.mute_command,
             'threshold': self.threshold_command,
+            'release': self.release_command,
         }
 
         self.packet_handlers = {
@@ -223,11 +224,12 @@ class Client:
         memory_read = self.among_us_memory.read()
         self.last_memory_read = memory_read
         if memory_read.local_player:
-            names, gains = self.audio_engine.get_audio_levels(memory_read, self.settings)
+            names, gains, can_hear_me = self.audio_engine.get_audio_levels(memory_read, self.settings)
 
             self.send(packets.AudioLevelsPacket(clientId=self.client_id,
                                                 playerName=memory_read.local_player.name,
                                                 playerNames=names,
+                                                canHearMe=can_hear_me,
                                                 gains=gains), tcp=False)
 
     def read_memory_loop(self):
@@ -237,7 +239,8 @@ class Client:
             try:
                 self.read_memory_and_send()
                 sleep(0.05)
-            except Exception:
+            except Exception as e:
+                print(e)
                 sleep(5)
                 self._poll_among_us()
             
@@ -276,9 +279,19 @@ class Client:
     def threshold_command(self, args):
         try:
             self.noise_threshold = int(args[0])
+            print("Good job Mike, you're pretty good at computers!")
         except:
             print("Please enter a valid number, like this: 'threshhold 250'")
     
+    def release_command(self, args):
+        try:
+            milliseconds_per_frame = consts.FRAME_DURATION * 1000
+            val = int(args[0])
+            self.release_frame_duration = int(val // milliseconds_per_frame)
+            print("Success!")
+        except:
+            print("Please enter a valid integer(milliseconds)!")
+
     def on_shift(self, e):
         if e.event_type == keyboard.KEY_DOWN:
             if self.last_memory_read \
