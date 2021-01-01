@@ -123,16 +123,29 @@ class AmongUsMemory:
                 players.append(player)
         return players, local_player
 
+    # task = [int(idx), uint(id)] id == 19 (FixComms)
+
     def _parse_player(self, data):
         values = self._named_fields_from_struct(struct.unpack(self.struct_format, data))
         object_ptr = values['objectPtr']
 
         is_local = self.read_memory(object_ptr, self.offsets['player']['isLocal'], self.pm.read_int)
 
-        position_offsets = self._get_position_offsets(is_local)
+        task_list_ptr = self.read_memory(object_ptr, [0x74], self.pm.read_uint)
 
-        x_pos = self.read_memory(object_ptr, position_offsets[0], self.pm.read_float)
-        y_pos = self.read_memory(object_ptr, position_offsets[1], self.pm.read_float)
+        array_items = self.pm.read_uint(task_list_ptr)
+        for _ in range(4):
+            task_obj_ptr = self.pm.read_int(array_items)
+            idx = self.pm.read_int(task_obj_ptr+4)
+            task_id = self.pm.read_int(task_obj_ptr+8)
+            print("found task idx %d, id %d" % (idx, task_id))
+            array_items += 4
+
+        x_offsets, y_offsets = self._get_position_offsets(is_local)
+
+        x_pos = self.read_memory(object_ptr, x_offsets, self.pm.read_float)
+        y_pos = self.read_memory(object_ptr, y_offsets, self.pm.read_float)
+        #print("read X from %s, Y from %s" % (x_off, y_off))
         in_vent = self.read_memory(object_ptr, self.offsets['player']['inVent'], self.pm.read_uchar) != 0
 
         return Player(

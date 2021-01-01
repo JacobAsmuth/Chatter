@@ -36,8 +36,8 @@ class Client:
         self.release_frame = -1
         self.release_frame_duration = 10
         self.last_memory_read: MemoryRead = None
-        self.imposter_chat = False
-        self.noise_threshold = 200
+        self.imposter_voice = False
+        self.noise_threshold = 100
 
         keyboard.hook_key("shift", self.on_shift)
         keyboard.on_press_key(29, self.on_right_ctrl)
@@ -224,12 +224,14 @@ class Client:
         memory_read = self.among_us_memory.read()
         self.last_memory_read = memory_read
         if memory_read.local_player:
-            names, gains, can_hear_me = self.audio_engine.get_audio_levels(memory_read, self.settings)
+            names, gains, can_hear_me = self.audio_engine.get_audio_levels(memory_read, self.settings, self.imposter_voice)
             self.send(packets.AudioLevelsPacket(clientId=self.client_id,
                                                 playerName=memory_read.local_player.name,
                                                 playerNames=names,
                                                 canHearMe=can_hear_me,
                                                 gains=gains), tcp=False)
+            return memory_read.local_player.pos
+        return None
 
     def read_memory_loop(self):
         self._poll_among_us()
@@ -237,9 +239,8 @@ class Client:
         while not self.closing:
             try:
                 self.read_memory_and_send()
-                sleep(0.05)
-            except Exception as e:
-                print(e)
+                sleep(0.16)
+            except Exception:
                 sleep(5)
                 self._poll_among_us()
             
@@ -298,12 +299,12 @@ class Client:
               and self.last_memory_read.local_player.impostor \
               and self.settings.imposter_voice_allowed \
               and (self.settings.imposter_voice_during_discussion or self.last_memory_read.game_state != GameState.DISCUSSION):
-                self.imposter_chat = True
+                self.imposter_voice = True
                 winsound.Beep(200, 100)
         else:  # key up
-            if self.imposter_chat:
+            if self.imposter_voice:
                 winsound.Beep(200, 100)
-            self.imposter_chat = False
+            self.imposter_voice = False
 
     def on_right_ctrl(self, e):
         if e.name != "right ctrl":
